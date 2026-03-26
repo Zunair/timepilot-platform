@@ -51,9 +51,16 @@ export const env = {
   MICROSOFT_CLIENT_SECRET: process.env.MICROSOFT_CLIENT_SECRET,
   MICROSOFT_CALLBACK_URL: process.env.MICROSOFT_CALLBACK_URL,
 
-  // Notifications
-  SENDGRID_API_KEY: process.env.SENDGRID_API_KEY,
-  TWILIO_ACCOUNT_SID: process.env.TWILIO_ACCOUNT_SID,
-  TWILIO_AUTH_TOKEN: process.env.TWILIO_AUTH_TOKEN,
+  // Notifications — Email (SendGrid SMTP relay or any SMTP provider)
+  SENDGRID_API_KEY:  process.env.SENDGRID_API_KEY,
+  SMTP_HOST:         process.env.SMTP_HOST,
+  SMTP_PORT:         parseInt(process.env.SMTP_PORT || '587', 10),
+  SMTP_USER:         process.env.SMTP_USER ?? 'apikey',
+  SMTP_PASS:         process.env.SMTP_PASS,
+  SMTP_FROM:         process.env.SMTP_FROM,
+
+  // Notifications — SMS (Twilio)
+  TWILIO_ACCOUNT_SID:  process.env.TWILIO_ACCOUNT_SID,
+  TWILIO_AUTH_TOKEN:   process.env.TWILIO_AUTH_TOKEN,
   TWILIO_PHONE_NUMBER: process.env.TWILIO_PHONE_NUMBER,
 };

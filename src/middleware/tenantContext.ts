@@ -1,9 +1,10 @@
 /**
  * Tenant Context Middleware
- * 
- * Extracts and validates tenant context from authenticated requests.
- * Resolves tenant context server-side from session, never trusting client input.
- * 
+ *
+ * Reads the session_id cookie, validates it against the DB, and resolves
+ * the caller's tenant context server-side. Client input is never trusted
+ * to set organization or role.
+ *
  * Verification checklist:
  * - Tenant context is resolved server-side ✓
  * - Authorization checks follow least-privilege ✓
@@ -11,49 +12,47 @@
  */
 
 import { Request, Response, NextFunction } from 'express';
-import { TenantContext, RoleType, UUID } from '../types/index.js';
-
-interface SessionContext {
-  userId?: string;
-  organizationId?: string;
-  role?: RoleType;
-}
+import { TenantContext, RoleType } from '../types/index.js';
+import { sessionService } from '../services/SessionService.js';
 
 declare global {
   namespace Express {
     interface Request {
       tenant?: TenantContext;
-      session?: SessionContext;
     }
   }
 }
 
 /**
- * Middleware to extract and validate tenant context from session
- * Server-side resolution ensures tenant scope cannot be tampered with from client.
+ * Validate the session cookie and populate req.tenant.
+ * Returns 401 if the session is absent or expired.
+ * Async errors propagate to the global error handler via next(err).
  */
 export function tenantContextMiddleware(
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ): void {
-  // In a real implementation, this would be populated by the session middleware
-  // which loads session data from the database/Redis using the session ID.
-  // The session contains the authenticated user's organization and role.
+  (async () => {
+    const sessionId = sessionService.parseSessionId(req.headers.cookie);
+    if (!sessionId) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: 'No session cookie' });
+      return;
+    }
 
-  if (!req.session?.userId || !req.session?.organizationId) {
-    res.status(401).json({ error: 'UNAUTHORIZED', message: 'No valid session' });
-    return;
-  }
+    const payload = await sessionService.validate(sessionId);
+    if (!payload) {
+      res.status(401).json({ error: 'UNAUTHORIZED', message: 'Session expired or invalid' });
+      return;
+    }
 
-  // Server-side context - cannot be tampered with from client
-  req.tenant = {
-    organizationId: req.session.organizationId as UUID,
-    userId: req.session.userId as UUID,
-    role: req.session.role as RoleType,
-  };
-
-  next();
+    req.tenant = {
+      organizationId: payload.organizationId,
+      userId:         payload.userId,
+      role:           payload.role,
+    };
+    next();
+  })().catch(next);
 }
 
 /**

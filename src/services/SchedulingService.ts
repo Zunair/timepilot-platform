@@ -1,0 +1,119 @@
+import { UUID, TenantContext, DayOfWeek } from '../types/index.js';
+import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
+import { appointmentRepository } from '../repositories/AppointmentRepository.js';
+import { rangesOverlap, getDayOfWeekInTimezone, localDateToUTCSearchRange } from '../utils/timezone.js';
+
+export interface TimeSlot {
+  startTime: string; // UTC ISO
+  endTime:   string; // UTC ISO
+}
+
+export interface GetAvailableSlotsParams {
+  userId:               UUID;
+  date:                 string; // YYYY-MM-DD in the client's timezone
+  clientTimezone:       string;
+  slotDurationMinutes:  number;
+  tenant:               TenantContext;
+}
+
+export class SchedulingService {
+  /**
+   * Compute available booking slots for a user on a given calendar date.
+   *
+   * Algorithm:
+   *   1. Build a generous UTC search range for the requested local date.
+   *   2. Fetch availability windows that overlap that range.
+   *   3. Filter each window by days_of_week (evaluated in the availability's
+   *      own timezone so DST is handled correctly).
+   *   4. Generate fixed-duration slots within each window, advancing by
+   *      slotDuration + bufferMinutes between consecutive offers.
+   *   5. Remove slots that conflict with existing scheduled appointments,
+   *      applying buffer padding on both sides of each candidate slot.
+   *   6. Return sorted, deduplicated slot list.
+   */
+  async getAvailableSlots(params: GetAvailableSlotsParams): Promise<TimeSlot[]> {
+    const { userId, date, slotDurationMinutes, tenant } = params;
+
+    const { from: utcFrom, to: utcTo } = localDateToUTCSearchRange(date);
+
+    const availabilities = await availabilityRepository.findActiveInRange(
+      userId, utcFrom, utcTo, tenant,
+    );
+    if (availabilities.length === 0) return [];
+
+    const existingAppointments = await appointmentRepository.findConflicting(
+      userId, utcFrom, utcTo, tenant,
+    );
+
+    const slotMs   = slotDurationMinutes * 60_000;
+    const slots: TimeSlot[] = [];
+
+    for (const avail of availabilities) {
+      const bufferMs = avail.bufferMinutes * 60_000;
+
+      // Filter by day-of-week if the availability has a day restriction.
+      // Use the availability's own timezone for the day-of-week check (DST-safe).
+      if (avail.daysOfWeek && avail.daysOfWeek.length > 0) {
+        // Check which day the requested local date falls on, in the availability timezone.
+        const requestedDayUTC = `${date}T12:00:00.000Z`; // noon UTC is a safe proxy for any TZ
+        const dow = getDayOfWeekInTimezone(requestedDayUTC, avail.timezone) as DayOfWeek;
+        if (!avail.daysOfWeek.includes(dow)) continue;
+      }
+
+      const windowStart = new Date(avail.startTime).getTime();
+      const windowEnd   = new Date(avail.endTime).getTime();
+
+      let cursor = windowStart;
+      while (cursor + slotMs <= windowEnd) {
+        const slotStart = cursor;
+        const slotEnd   = cursor + slotMs;
+
+        const slotStartIso = new Date(slotStart).toISOString();
+        const slotEndIso   = new Date(slotEnd).toISOString();
+
+        // Expand the candidate slot by buffer on both sides for conflict detection.
+        const checkStart = new Date(slotStart - bufferMs).toISOString();
+        const checkEnd   = new Date(slotEnd   + bufferMs).toISOString();
+
+        const hasConflict = existingAppointments.some(appt =>
+          rangesOverlap(checkStart, checkEnd, appt.startTime, appt.endTime),
+        );
+
+        if (!hasConflict) {
+          slots.push({ startTime: slotStartIso, endTime: slotEndIso });
+        }
+
+        // Advance cursor by slot duration + inter-slot buffer.
+        cursor = slotEnd + bufferMs;
+      }
+    }
+
+    // Sort and deduplicate (a date range could appear from overlapping windows).
+    return slots
+      .sort((a, b) => a.startTime.localeCompare(b.startTime))
+      .filter((s, idx, arr) => idx === 0 || s.startTime !== arr[idx - 1].startTime);
+  }
+
+  /**
+   * Confirm that a specific UTC time range has no conflicting appointments.
+   * Used as the final guard before persisting a booking.
+   */
+  async isSlotAvailable(params: {
+    userId:               UUID;
+    startTime:            string;
+    endTime:              string;
+    tenant:               TenantContext;
+    excludeAppointmentId?: UUID;
+  }): Promise<boolean> {
+    const conflicts = await appointmentRepository.findConflicting(
+      params.userId,
+      params.startTime,
+      params.endTime,
+      params.tenant,
+      params.excludeAppointmentId,
+    );
+    return conflicts.length === 0;
+  }
+}
+
+export const schedulingService = new SchedulingService();

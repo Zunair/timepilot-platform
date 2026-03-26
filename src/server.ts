@@ -11,8 +11,11 @@ import helmet from 'helmet';
 import { env } from './config/env.js';
 import { runMigrations } from './db/migrate.js';
 import { errorHandler } from './middleware/errorHandler.js';
-import { tenantContextMiddleware, requireRole } from './middleware/tenantContext.js';
-import { RoleType } from './types/index.js';
+import { authRouter } from './routes/auth.routes.js';
+import { availabilityRouter } from './routes/availability.routes.js';
+import { appointmentsRouter, confirmationRouter } from './routes/appointments.routes.js';
+import { organizationsRouter } from './routes/organizations.routes.js';
+import { startNotificationWorker } from './workers/NotificationWorker.js';
 
 const app = express();
 
@@ -49,43 +52,14 @@ app.get('/health', (req, res) => {
 });
 
 // ============================================================================
-// PLACEHOLDER ROUTES (to be implemented)
+// API ROUTES
 // ============================================================================
 
-// Authentication routes (OAuth, session management)
-app.post('/api/auth/login', (req, res) => {
-  res.json({ message: 'Auth endpoint - to be implemented' });
-});
-
-app.post('/api/auth/logout', (req, res) => {
-  res.json({ message: 'Logout endpoint - to be implemented' });
-});
-
-// Organization routes
-app.get('/api/organizations/:organizationId', tenantContextMiddleware, (req, res) => {
-  res.json({ message: 'Get organization endpoint - to be implemented' });
-});
-
-// Availability routes
-app.post('/api/organizations/:organizationId/availabilities',
-  tenantContextMiddleware,
-  requireRole(RoleType.OWNER, RoleType.ADMIN),
-  (req, res) => {
-    res.json({ message: 'Create availability endpoint - to be implemented' });
-  }
-);
-
-// Appointment routes
-app.post('/api/organizations/:organizationId/appointments', (req, res) => {
-  res.json({ message: 'Create appointment (public booking) - to be implemented' });
-});
-
-app.get('/api/organizations/:organizationId/appointments',
-  tenantContextMiddleware,
-  (req, res) => {
-    res.json({ message: 'List appointments - to be implemented' });
-  }
-);
+app.use('/api/auth', authRouter);
+app.use('/api/appointments/confirm', confirmationRouter);
+app.use('/api/organizations', organizationsRouter);
+app.use('/api/organizations/:organizationId/availability', availabilityRouter);
+app.use('/api/organizations/:organizationId/appointments', appointmentsRouter);
 
 // ============================================================================
 // ERROR HANDLING
@@ -110,6 +84,9 @@ async function startServer(): Promise<void> {
   try {
     // Run database migrations
     await runMigrations();
+
+    // Start notification worker (optional — logs warning if SMTP not configured)
+    startNotificationWorker();
 
     // Start HTTP server
     app.listen(env.PORT, () => {
