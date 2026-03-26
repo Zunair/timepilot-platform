@@ -60,7 +60,10 @@ Detailed task tracking for each phase is maintained in:
 - Commit in small, traceable changes with descriptive messages.
 - `/cp` means commit and push.
 - Do not rewrite shared history without explicit approval.
-- After each major change, run tests and capture logs under `/logs/copilot/` before `/cp`.
+- Persist tests in the repository as part of the change; do not rely on ad hoc manual-only verification.
+- Each implementation iteration must leave behind rerunnable tests or an updated automated verification path covering the changed behavior.
+- Before `/cp`, rerun the stored verification commands for the current iteration and capture logs under `/logs/copilot/`.
+- If behavior changes but no persistent test or rerunnable verification was added or updated, the item is not ready for `/cp`.
 - If tests fail, do not run `/cp`; update TODO state and blocker details first.
 
 ## Local Environment Command Policy
