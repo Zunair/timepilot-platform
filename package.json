@@ -1,0 +1,55 @@
+{
+  "name": "timepilot-platform",
+  "version": "1.0.0-alpha",
+  "description": "Enterprise-grade multi-tenant calendar booking platform",
+  "type": "module",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "tsx watch src/server.ts",
+    "dev:client": "tsx watch src/client.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "migrate": "tsx src/db/migrate.ts",
+    "migrate:rollback": "tsx src/db/rollback.ts",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src/",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "calendar",
+    "booking",
+    "appointments",
+    "multi-tenant"
+  ],
+  "author": "TimePilot Team",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "pg": "^8.10.0",
+    "pg-pool": "^3.6.1",
+    "cors": "^2.8.5",
+    "helmet": "^7.0.0",
+    "dotenv": "^16.3.1",
+    "joi": "^17.11.0",
+    "uuid": "^9.0.1",
+    "bull": "^4.11.4",
+    "redis": "^4.6.12",
+    "nodemailer": "^6.9.7",
+    "twilio": "^4.10.0",
+    "zustand": "^4.4.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "@types/cors": "^2.8.17",
+    "@types/node": "^20.8.0",
+    "@types/express": "^4.17.20",
+    "@types/pg": "^8.10.7",
+    "@types/uuid": "^9.0.5",
+    "tsx": "^3.14.0",
+    "vitest": "^0.34.6",
+    "eslint": "^8.51.0",
+    "@typescript-eslint/eslint-plugin": "^6.8.1",
+    "@typescript-eslint/parser": "^6.8.1"
+  }
+}

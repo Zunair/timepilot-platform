@@ -13,10 +13,13 @@ Build a beautiful, futuristic, intuitive, enterprise-grade multi-tenant calendar
 - Last review date: 2026-03-26
 - Approved by: Tech Lead
 - Active blockers: None
+- Current milestone: Foundational Architecture ✅ COMPLETED
 - Next priority items:
-   - Finalize Phase 1 gate checks and verification pass
-   - Implement highest-priority approved Phase 1 TODO items
-   - Keep TODO states aligned with actual implementation status
+   - Implement OAuth 2.0 integration (Google, Apple, Microsoft)
+   - Build session management and authentication flows
+   - Create scheduling engine (availability & appointment logic)
+   - Implement client booking UI (React components)
+   - Build async notification system (email/SMS)
 
 ## TODO Management & Phase Tracking
 **All work MUST follow this workflow to prevent drift and ensure accountability:**
@@ -59,6 +62,15 @@ Detailed task tracking for each phase is maintained in:
 - Do not rewrite shared history without explicit approval.
 - After each major change, run tests and capture logs under `/logs/copilot/` before `/cp`.
 - If tests fail, do not run `/cp`; update TODO state and blocker details first.
+
+## Local Environment Command Policy
+- Default to Windows 11 as the primary local development environment.
+- Prefer PowerShell-compatible commands in all generated instructions, scripts, and examples.
+- Use PowerShell as the only documented shell for repository-local setup, verification, and developer workflow guidance.
+- Do not default to bash-only commands such as `cp`, `rm -rf`, `export`, `grep`, or `ls` when documenting local setup for this repository.
+- Prefer `Copy-Item` over `cp`, `Remove-Item -Recurse -Force` over `rm -rf`, `$env:NAME = 'value'` over `export NAME=value`, and `Get-ChildItem` over `ls` in repository documentation and guidance.
+- Use Windows-compatible path examples where practical.
+- If a tool or runtime command differs between shells, document the PowerShell form as the source of truth for this codebase.
 
 > **Note:** Coding standards and engineering best practices are maintained in [/.claude/rules/code.instructions.md](/.claude/rules/code.instructions.md), which is automatically loaded when writing/modifying code.
 > Additional rule sets: [/.claude/rules/documentation.instructions.md](/.claude/rules/documentation.instructions.md), [/.claude/rules/sql.instructions.md](/.claude/rules/sql.instructions.md), [/.claude/rules/scripts.instructions.md](/.claude/rules/scripts.instructions.md), [/.claude/rules/mobile.instructions.md](/.claude/rules/mobile.instructions.md).

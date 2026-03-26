@@ -7,20 +7,22 @@
 - Approval: Tech Lead
 - Verification: /.github/instructions/verification.md
 - Gate: /.github/instructions/phase-gates.md
+- Architecture: /docs/ARCHITECTURE.md
+- Implementation Status: /docs/IMPLEMENTATION_STATUS.md
 
 ## Core Architecture
-- [ ] NOT-STARTED Implement multi-tenant architecture with strict tenant isolation
-  - [ ] NOT-STARTED Design tenant data segregation strategy
-  - [ ] NOT-STARTED Implement tenant context middleware
-  - [ ] NOT-STARTED Create tenant configuration management
-  - [ ] NOT-STARTED Set up database schemas with tenant isolation
-  - [ ] NOT-STARTED Add tenant-based query filtering on all repositories
+- [x] COMPLETED Implement multi-tenant architecture with strict tenant isolation
+  - [x] COMPLETED Design tenant data segregation strategy (ADR-0001)
+  - [x] COMPLETED Implement tenant context middleware (src/middleware/tenantContext.ts)
+  - [x] COMPLETED Create tenant configuration management (src/config/)
+  - [x] COMPLETED Set up database schemas with tenant isolation (src/db/migrate.ts)
+  - [x] COMPLETED Add tenant-based query filtering on all repositories (BaseRepository pattern)
 
-- [ ] NOT-STARTED Design and implement multi-user org model with roles
-  - [ ] NOT-STARTED Define role hierarchy (Owner, Admin, Member, Viewer)
-  - [ ] NOT-STARTED Create role permission matrix
-  - [ ] NOT-STARTED Implement role-based access control middleware
-  - [ ] NOT-STARTED Build org member management system
+- [x] IN-PROGRESS Design and implement multi-user org model with roles
+  - [x] COMPLETED Define role hierarchy (Owner, Admin, Member, Viewer) (src/types/index.ts)
+  - [ ] IN-PROGRESS Create role permission matrix
+  - [x] COMPLETED Implement role-based access control middleware (src/middleware/tenantContext.ts)
+  - [x] COMPLETED Build org member management system (src/repositories/OrganizationMemberRepository.ts)
 
 ## Authentication & Authorization
 - [ ] NOT-STARTED Implement social login with OAuth/OIDC
@@ -51,8 +53,8 @@
   - [ ] NOT-STARTED Add appointment rescheduling
 
 ## Client Booking Interface
-- [ ] NOT-STARTED Build client-facing booking experience
-  - [ ] NOT-STARTED Create calendar UI with date navigation
+- [ ] IN-PROGRESS Build client-facing booking experience
+  - [x] IN-PROGRESS Create calendar UI with date navigation (placeholder client app scaffold on port 3001)
   - [ ] NOT-STARTED Implement month view navigation
   - [ ] NOT-STARTED Build time-slot selection component
   - [ ] NOT-STARTED Add appointment summary display
@@ -96,16 +98,16 @@
   - [ ] NOT-STARTED Add dead-letter queue for failed notifications
 
 ## Backend Persistence
-- [ ] NOT-STARTED Set up database schema
-  - [ ] NOT-STARTED Create all entities with proper relationships
-  - [ ] NOT-STARTED Store all backend timestamps in UTC only
-  - [ ] NOT-STARTED Add timezone context fields for user intent auditing
-  - [ ] NOT-STARTED Create database migration system
+- [x] COMPLETED Set up database schema (src/db/migrate.ts)
+  - [x] COMPLETED Create all entities with proper relationships
+  - [x] COMPLETED Store all backend timestamps in UTC only
+  - [x] COMPLETED Add timezone context fields for user intent auditing
+  - [x] COMPLETED Create database migration system (forward-only, auditable)
 
-- [ ] NOT-STARTED Build ORM/data access layer
-  - [ ] NOT-STARTED Create repository pattern implementations
-  - [ ] NOT-STARTED Implement query builders for common operations
-  - [ ] NOT-STARTED Add database connection pooling
+- [x] COMPLETED Build ORM/data access layer (src/repositories/)
+  - [x] COMPLETED Create repository pattern implementations (BaseRepository + specific repos)
+  - [x] COMPLETED Implement query builders for common operations (findById, findAll, etc)
+  - [x] COMPLETED Add database connection pooling (src/config/db.ts)
 
 ## Frontend Timezone Handling
 - [ ] NOT-STARTED Implement timezone conversion at presentation layer
@@ -116,10 +118,10 @@
   - [ ] NOT-STARTED Store timezone preference in client sessions
 
 ## Testing & Quality
-- [ ] IN-PROGRESS Write comprehensive unit tests
+- [ ] NOT-STARTED Write comprehensive unit tests
   - [ ] NOT-STARTED Test scheduling engine logic
   - [ ] NOT-STARTED Test timezone conversion edge cases
-  - [ ] NOT-STARTED Test RBAC enforcement
+  - [ ] NOT-STARTED Test RBAC enforcement (unit tests for middleware)
   - [ ] NOT-STARTED Test notification queue processing
 
 - [ ] NOT-STARTED Write integration tests
@@ -134,8 +136,10 @@
   - [ ] NOT-STARTED Test reminders during DST transitions
 
 ## Documentation
+- [x] COMPLETED Architecture documentation (docs/ARCHITECTURE.md)
+- [x] COMPLETED Implementation status documentation (docs/IMPLEMENTATION_STATUS.md)
 - [ ] NOT-STARTED Create API documentation
 - [ ] NOT-STARTED Document booking flow for clients
 - [ ] NOT-STARTED Create admin setup guide
-- [ ] NOT-STARTED Document timezone handling approach
+- [ ] NOT-STARTED Document timezone handling approach (in progress)
 
