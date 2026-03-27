@@ -114,6 +114,14 @@ describe('BOOKING_HTML API integration', () => {
     expect(BOOKING_HTML).toContain('/availability/slots');
   });
 
+  it('unwraps data.slots from the slots API response envelope', () => {
+    // The /availability/slots endpoint returns { date, timezone, slots: [...] }.
+    // The client must read data.slots, not the whole response object, otherwise
+    // S.slots.map() throws and the catch handler shows "No available times".
+    expect(BOOKING_HTML).toContain('data.slots');
+  });
+
+
   it('calls appointments create endpoint via POST', () => {
     expect(BOOKING_HTML).toContain('/appointments');
     expect(BOOKING_HTML).toContain("method: 'POST'");

@@ -395,7 +395,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
              + '&timezone=' + encodeURIComponent(S.tz)
              + '&duration=' + S.duration;
       apiFetch('/api/organizations/' + S.org.id + '/availability/slots?' + qs)
-        .then(function(slots) { S.slots = slots; S.step = 'slots'; render(); })
+        .then(function(data) { S.slots = data.slots || []; S.step = 'slots'; render(); })
         .catch(function()     { S.slots = [];    S.step = 'slots'; render(); });
     }
 
