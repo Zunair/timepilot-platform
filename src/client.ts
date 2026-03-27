@@ -10,6 +10,7 @@
  */
 
 import http from 'node:http';
+import { fileURLToPath } from 'node:url';
 import { env } from './config/env.js';
 
 const clientPort = Number(new URL(env.CLIENT_BASE_URL).port || 3001);
@@ -735,19 +736,22 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 </html>`;
 
 // ─────────────────────────────────────────────────────────────────────────────
-// HTTP Server
+// HTTP Server — only started when this file is the process entry point.
+// When imported by tests (to inspect BOOKING_HTML), no server is created.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const server = http.createServer((_req, res) => {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-  res.end(BOOKING_HTML);
-});
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(BOOKING_HTML);
+  });
 
-server.listen(clientPort, () => {
-  console.log(`TimePilot booking UI started on ${env.CLIENT_BASE_URL}`);
-  console.log(`  Usage:   ${env.CLIENT_BASE_URL}/?org=<slug>&user=<userId>`);
-  console.log(`  Confirm: ${env.CLIENT_BASE_URL}/?ref=<confirmationRef>`);
-});
+  server.listen(clientPort, () => {
+    console.log(`TimePilot booking UI started on ${env.CLIENT_BASE_URL}`);
+    console.log(`  Usage:   ${env.CLIENT_BASE_URL}/?org=<slug>&user=<userId>`);
+    console.log(`  Confirm: ${env.CLIENT_BASE_URL}/?ref=<confirmationRef>`);
+  });
 
-process.on('SIGTERM', () => server.close());
-process.on('SIGINT',  () => server.close());
+  process.on('SIGTERM', () => server.close());
+  process.on('SIGINT',  () => server.close());
+}

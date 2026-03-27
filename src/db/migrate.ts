@@ -11,6 +11,7 @@
  */
 
 import { query as db, closePool } from '../config/db.js';
+import { fileURLToPath } from 'node:url';
 
 /**
  * Ensure migrations table exists
@@ -65,10 +66,15 @@ async function main(): Promise<void> {
   }
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exit(1);
-});
+// Only execute when this file is run directly (e.g. `node dist/db/migrate.js`).
+// When imported by server.ts, runMigrations() is called explicitly without
+// closing the shared pool.
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  main().catch((error) => {
+    console.error(error);
+    process.exit(1);
+  });
+}
 
 /**
  * Migration 001: Initial Schema
