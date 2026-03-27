@@ -1,7 +1,7 @@
 # Phase 1 (MVP) - TODO
 ## Phase Status
 - State: IN-PROGRESS
-- Last Updated: 2026-03-26
+- Last Updated: 2026-03-27
 - Owner: Tech Lead
 - Active Blockers: None
 - Approval: Tech Lead
@@ -53,16 +53,16 @@
   - [ ] NOT-STARTED Add appointment rescheduling
 
 ## Client Booking Interface
-- [ ] IN-PROGRESS Build client-facing booking experience
-  - [x] IN-PROGRESS Create calendar UI with date navigation (placeholder client app scaffold on port 3001)
-  - [ ] NOT-STARTED Implement month view navigation
-  - [ ] NOT-STARTED Build time-slot selection component
-  - [ ] NOT-STARTED Add appointment summary display
-  - [ ] NOT-STARTED Implement client form (name, email, phone)
+- [x] COMPLETED Build client-facing booking experience
+  - [x] COMPLETED Create calendar UI with date navigation (month view, prev/next nav, past-date disabling)
+  - [x] COMPLETED Implement month view navigation (prev/next buttons, disabled when at current month)
+  - [x] COMPLETED Build time-slot selection component (slot pill grid loaded per date via availability API)
+  - [x] COMPLETED Add appointment summary display (slot summary card shown before form)
+  - [x] COMPLETED Implement client form (name*, email*, phone, notes with client-side validation)
 
-- [x] IN-PROGRESS Build booking confirmation flow
-  - [ ] NOT-STARTED Display booking summary to client (frontend pending)
-  - [ ] NOT-STARTED Create confirmation button and success state (frontend pending)
+- [x] COMPLETED Build booking confirmation flow
+  - [x] COMPLETED Display booking summary to client (confirmation screen with date/time/timezone/name)
+  - [x] COMPLETED Create confirmation button and success state (confirmed screen with copyable ref code)
   - [x] COMPLETED Generate booking reference/confirmation number (TP-YYYYMMDD-XXXXXXXX via src/utils/confirmation.ts)
 
 ## Settings & Configuration
