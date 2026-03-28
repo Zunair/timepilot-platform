@@ -46,11 +46,19 @@ vi.mock('../repositories/OrganizationMemberRepository.js', () => ({
   },
 }));
 
+vi.mock('../repositories/OAuthAccountRepository.js', () => ({
+  oauthAccountRepository: {
+    findByUserAndProvider: vi.fn(),
+    upsert: vi.fn(),
+  },
+}));
+
 import { authRouter } from '../routes/auth.routes.js';
 import { sessionService } from '../services/SessionService.js';
 import { userRepository } from '../repositories/UserRepository.js';
 import { organizationRepository } from '../repositories/OrganizationRepository.js';
 import { organizationMemberRepository } from '../repositories/OrganizationMemberRepository.js';
+import { oauthAccountRepository } from '../repositories/OAuthAccountRepository.js';
 
 const MOCK_ORG = { id: 'org-1', slug: 'acme' };
 const MOCK_USER = {
@@ -147,8 +155,18 @@ describe('auth callback integration (router-level)', () => {
     vi.clearAllMocks();
     vi.stubGlobal('fetch', vi.fn());
 
+    vi.mocked(sessionService.parseSessionId).mockReturnValue('session-1');
+    vi.mocked(sessionService.validate).mockResolvedValue({
+      sessionId: 'session-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      role: 'MEMBER',
+    } as any);
+
     vi.mocked(organizationRepository.findBySlug).mockResolvedValue(MOCK_ORG as any);
     vi.mocked(organizationMemberRepository.findByUserAndOrganization).mockResolvedValue({ role: 'MEMBER' } as any);
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue(null);
+    vi.mocked(oauthAccountRepository.upsert).mockResolvedValue({ id: 'oauth-1' } as any);
     vi.mocked(sessionService.create).mockResolvedValue({
       session: { id: 'session-1' },
       cookie: 'session_id=session-1; HttpOnly; SameSite=Strict; Path=/',
@@ -197,6 +215,11 @@ describe('auth callback integration (router-level)', () => {
       email: 'person@example.com',
       firstName: 'Jane',
       lastName: 'Doe',
+    }));
+    expect(oauthAccountRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      provider: 'google',
+      accessToken: 'token-123',
     }));
   });
 
@@ -260,10 +283,124 @@ describe('auth callback integration (router-level)', () => {
       organizationId: 'org-1',
       role: 'MEMBER',
     });
+    expect(oauthAccountRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      provider: 'apple',
+    }));
     expect(userRepository.create).toHaveBeenCalledWith(expect.objectContaining({
       email: 'apple.person@example.com',
       firstName: 'Apple',
       lastName: 'Person',
     }));
+  });
+
+  it('returns existing token without provider refresh when token is still fresh', async () => {
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
+      id: 'oauth-1',
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: 'still-fresh-token',
+      refreshToken: 'refresh-token',
+      accessTokenExpiresAt: new Date(Date.now() + 10 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+
+    const res = await request('/api/auth/providers/google/refresh', {
+      method: 'POST',
+      headers: { cookie: 'session_id=session-1' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({
+      provider: 'google',
+      accessToken: 'still-fresh-token',
+      expiresAt: expect.any(String),
+      refreshed: false,
+    });
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
+  it('refreshes expired token and persists rotated values', async () => {
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
+      id: 'oauth-1',
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: 'expired-token',
+      refreshToken: 'old-refresh-token',
+      accessTokenExpiresAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+    vi.mocked(oauthAccountRepository.upsert).mockResolvedValue({
+      id: 'oauth-1',
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: 'new-token',
+      refreshToken: 'new-refresh-token',
+      accessTokenExpiresAt: new Date(Date.now() + 3600 * 1000).toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+    vi.mocked(global.fetch as any).mockResolvedValueOnce(
+      new Response(JSON.stringify({
+        access_token: 'new-token',
+        refresh_token: 'new-refresh-token',
+        expires_in: 3600,
+        token_type: 'Bearer',
+        scope: 'openid email profile',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+
+    const res = await request('/api/auth/providers/google/refresh', {
+      method: 'POST',
+      headers: { cookie: 'session_id=session-1' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({
+      provider: 'google',
+      accessToken: 'new-token',
+      expiresAt: expect.any(String),
+      refreshed: true,
+    });
+    expect(oauthAccountRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: 'new-token',
+      refreshToken: 'new-refresh-token',
+    }));
+  });
+
+  it('returns 409 when account has no refresh token', async () => {
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
+      id: 'oauth-1',
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: undefined,
+      refreshToken: undefined,
+      accessTokenExpiresAt: undefined,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    } as any);
+
+    const res = await request('/api/auth/providers/google/refresh', {
+      method: 'POST',
+      headers: { cookie: 'session_id=session-1' },
+    });
+
+    expect(res.status).toBe(409);
+    expect(res.json()).toEqual({
+      error: 'OAUTH_REFRESH_NOT_AVAILABLE',
+      message: 'No refresh token is available for this provider account',
+    });
   });
 });
