@@ -13,6 +13,7 @@ import {
   rangesOverlap,
   isValidTimezone,
   localDateToUTCSearchRange,
+  localDateTimeInTimezoneToUTC,
 } from '../utils/timezone.js';
 
 // ============================================================================
@@ -196,5 +197,25 @@ describe('formatInTimezone', () => {
       hour12: false,
     });
     expect(result).toBe('03:05');
+  });
+});
+
+// ============================================================================
+// localDateTimeInTimezoneToUTC
+// ============================================================================
+
+describe('localDateTimeInTimezoneToUTC', () => {
+  it('converts local New York business hours to UTC during DST', () => {
+    expect(localDateTimeInTimezoneToUTC('2026-04-01', '09:00', 'America/New_York'))
+      .toBe('2026-04-01T13:00:00.000Z');
+    expect(localDateTimeInTimezoneToUTC('2026-04-01', '16:00', 'America/New_York'))
+      .toBe('2026-04-01T20:00:00.000Z');
+  });
+
+  it('converts local UTC business hours without shifting them', () => {
+    expect(localDateTimeInTimezoneToUTC('2026-04-01', '09:00', 'UTC'))
+      .toBe('2026-04-01T09:00:00.000Z');
+    expect(localDateTimeInTimezoneToUTC('2026-04-01', '16:00', 'UTC'))
+      .toBe('2026-04-01T16:00:00.000Z');
   });
 });
