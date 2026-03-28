@@ -5,6 +5,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 vi.mock('../config/env.js', () => ({
   env: {
     NODE_ENV: 'test',
+    CLIENT_BASE_URL: 'http://localhost:3001',
     GOOGLE_CLIENT_ID: 'google-client-id',
     GOOGLE_CLIENT_SECRET: 'google-client-secret',
     GOOGLE_CALLBACK_URL: 'http://localhost:3000/api/auth/google/callback',
@@ -31,18 +32,29 @@ vi.mock('../repositories/UserRepository.js', () => ({
     findByEmail: vi.fn(),
     create: vi.fn(),
     findById: vi.fn(),
+    update: vi.fn(),
   },
 }));
 
 vi.mock('../repositories/OrganizationRepository.js', () => ({
   organizationRepository: {
     findBySlug: vi.fn(),
+    findByIdRaw: vi.fn(),
+    create: vi.fn(),
   },
 }));
 
 vi.mock('../repositories/OrganizationMemberRepository.js', () => ({
   organizationMemberRepository: {
     findByUserAndOrganization: vi.fn(),
+    findOrganizationsForUser: vi.fn(),
+    create: vi.fn(),
+  },
+}));
+
+vi.mock('../repositories/SessionRepository.js', () => ({
+  sessionRepository: {
+    findLatestOrganizationForUser: vi.fn(),
   },
 }));
 
@@ -53,12 +65,20 @@ vi.mock('../repositories/OAuthAccountRepository.js', () => ({
   },
 }));
 
+vi.mock('../repositories/AvailabilityRepository.js', () => ({
+  availabilityRepository: {
+    create: vi.fn(),
+  },
+}));
+
 import { authRouter } from '../routes/auth.routes.js';
 import { sessionService } from '../services/SessionService.js';
 import { userRepository } from '../repositories/UserRepository.js';
 import { organizationRepository } from '../repositories/OrganizationRepository.js';
 import { organizationMemberRepository } from '../repositories/OrganizationMemberRepository.js';
+import { sessionRepository } from '../repositories/SessionRepository.js';
 import { oauthAccountRepository } from '../repositories/OAuthAccountRepository.js';
+import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
 
 const MOCK_ORG = { id: 'org-1', slug: 'acme' };
 const MOCK_USER = {
@@ -164,7 +184,17 @@ describe('auth callback integration (router-level)', () => {
     } as any);
 
     vi.mocked(organizationRepository.findBySlug).mockResolvedValue(MOCK_ORG as any);
+    vi.mocked(organizationRepository.findByIdRaw).mockResolvedValue(MOCK_ORG as any);
     vi.mocked(organizationMemberRepository.findByUserAndOrganization).mockResolvedValue({ role: 'MEMBER' } as any);
+    vi.mocked(organizationMemberRepository.findOrganizationsForUser).mockResolvedValue([
+      {
+        organizationId: 'org-1',
+        organizationSlug: 'acme',
+        organizationName: 'Acme Inc',
+        role: 'MEMBER',
+      },
+    ] as any);
+    vi.mocked(sessionRepository.findLatestOrganizationForUser).mockResolvedValue('org-1' as any);
     vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue(null);
     vi.mocked(oauthAccountRepository.upsert).mockResolvedValue({ id: 'oauth-1' } as any);
     vi.mocked(sessionService.create).mockResolvedValue({
@@ -178,7 +208,7 @@ describe('auth callback integration (router-level)', () => {
 
     expect(res.status).toBe(302);
     expect(res.headers.location).toContain('https://accounts.google.com/o/oauth2/v2/auth?');
-    expect(res.headers.location).toContain('state=acme');
+    expect(res.headers.location).toContain('state=');
   });
 
   it('creates a session after successful Google token/profile exchange', async () => {
@@ -203,12 +233,8 @@ describe('auth callback integration (router-level)', () => {
       method: 'GET',
     });
 
-    expect(res.status).toBe(200);
-    expect(res.json()).toEqual({
-      userId: 'user-1',
-      organizationId: 'org-1',
-      role: 'MEMBER',
-    });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('http://localhost:3001/');
     expect(String(res.headers['set-cookie'])).toContain('session_id=session-1');
 
     expect(userRepository.create).toHaveBeenCalledWith(expect.objectContaining({
@@ -277,12 +303,8 @@ describe('auth callback integration (router-level)', () => {
       body: form.toString(),
     });
 
-    expect(res.status).toBe(200);
-    expect(res.json()).toEqual({
-      userId: 'user-1',
-      organizationId: 'org-1',
-      role: 'MEMBER',
-    });
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('http://localhost:3001/');
     expect(oauthAccountRepository.upsert).toHaveBeenCalledWith(expect.objectContaining({
       userId: 'user-1',
       provider: 'apple',
@@ -292,6 +314,171 @@ describe('auth callback integration (router-level)', () => {
       firstName: 'Apple',
       lastName: 'Person',
     }));
+  });
+
+  it('returns current session organization list and email scope status', async () => {
+    vi.mocked(organizationMemberRepository.findOrganizationsForUser).mockResolvedValue([
+      {
+        organizationId: 'org-1',
+        organizationSlug: 'acme',
+        organizationName: 'Acme Inc',
+        role: 'MEMBER',
+      },
+      {
+        organizationId: 'org-2',
+        organizationSlug: 'globex',
+        organizationName: 'Globex',
+        role: 'ADMIN',
+      },
+    ] as any);
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
+      userId: 'user-1',
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      scope: 'openid email profile',
+    } as any);
+
+    const res = await request('/api/auth/organizations', {
+      method: 'GET',
+      headers: { cookie: 'session_id=session-1' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({
+      activeOrganizationId: 'org-1',
+      activeOrganizationSlug: 'acme',
+      organizations: [
+        { id: 'org-1', slug: 'acme', name: 'Acme Inc', role: 'MEMBER' },
+        { id: 'org-2', slug: 'globex', name: 'Globex', role: 'ADMIN' },
+      ],
+      emailNotifications: {
+        provider: 'google',
+        googleLinked: true,
+        enabled: false,
+      },
+    });
+  });
+
+  it('returns empty org list when logged-in user has no organization yet', async () => {
+    vi.mocked(sessionService.validate).mockResolvedValue({
+      sessionId: 'session-1',
+      userId: 'user-1',
+    } as any);
+    vi.mocked(organizationMemberRepository.findOrganizationsForUser).mockResolvedValue([] as any);
+
+    const res = await request('/api/auth/organizations', {
+      method: 'GET',
+      headers: { cookie: 'session_id=session-1' },
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({
+      activeOrganizationId: undefined,
+      activeOrganizationSlug: undefined,
+      organizations: [],
+      emailNotifications: {
+        provider: 'google',
+        googleLinked: false,
+        enabled: false,
+      },
+    });
+  });
+
+  it('creates org-less onboarding session when root login user has no memberships', async () => {
+    vi.mocked(userRepository.findByEmail).mockResolvedValue(MOCK_USER as any);
+    vi.mocked(organizationMemberRepository.findOrganizationsForUser).mockResolvedValue([] as any);
+
+    vi.mocked(global.fetch as any)
+      .mockResolvedValueOnce(new Response(JSON.stringify({ access_token: 'token-123' }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        email: 'person@example.com',
+        given_name: 'Jane',
+        family_name: 'Doe',
+      }), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      }));
+
+    const res = await request('/api/auth/google/callback?returnTo=http://localhost:3001/admin&code=google-code', {
+      method: 'GET',
+    });
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe('http://localhost:3001/admin');
+    expect(sessionService.create).toHaveBeenCalledWith('user-1');
+  });
+
+  it('creates a new organization and seeds default availability', async () => {
+    vi.mocked(userRepository.findById).mockResolvedValue(MOCK_USER as any);
+    vi.mocked(organizationRepository.findBySlug)
+      .mockResolvedValueOnce(null as any)
+      .mockResolvedValueOnce(MOCK_ORG as any);
+    vi.mocked(organizationRepository.create).mockResolvedValue({
+      id: 'org-9',
+      slug: 'acme-labs',
+    } as any);
+    vi.mocked(organizationMemberRepository.create).mockResolvedValue({ id: 'member-1' } as any);
+    vi.mocked(availabilityRepository.create).mockResolvedValue({ id: 'avail-1' } as any);
+
+    const res = await request('/api/auth/organizations/create', {
+      method: 'POST',
+      headers: {
+        cookie: 'session_id=session-1',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ name: 'Acme Labs', timezone: 'America/New_York' }),
+    });
+
+    expect(res.status).toBe(201);
+    expect(res.json()).toEqual({
+      userId: 'user-1',
+      organizationId: 'org-9',
+      organizationSlug: 'acme-labs',
+      role: 'owner',
+    });
+    expect(organizationMemberRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+      organizationId: 'org-9',
+      userId: 'user-1',
+      role: 'owner',
+    }));
+    expect(userRepository.update).toHaveBeenCalledWith('user-1', { timezone: 'America/New_York' });
+    expect(availabilityRepository.create).toHaveBeenCalled();
+    expect(availabilityRepository.create).toHaveBeenCalledWith(expect.objectContaining({
+      timezone: 'America/New_York',
+    }));
+  });
+
+  it('switches active organization for session user', async () => {
+    vi.mocked(organizationMemberRepository.findByUserAndOrganization).mockResolvedValue({
+      userId: 'user-1',
+      organizationId: 'org-2',
+      role: 'ADMIN',
+    } as any);
+    vi.mocked(organizationRepository.findByIdRaw).mockResolvedValue({
+      id: 'org-2',
+      slug: 'globex',
+    } as any);
+
+    const res = await request('/api/auth/organizations/select', {
+      method: 'POST',
+      headers: {
+        cookie: 'session_id=session-1',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ organizationId: 'org-2' }),
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({
+      userId: 'user-1',
+      organizationId: 'org-2',
+      organizationSlug: 'globex',
+      role: 'ADMIN',
+    });
+    expect(String(res.headers['set-cookie'])).toContain('session_id=session-1');
   });
 
   it('returns existing token without provider refresh when token is still fresh', async () => {
