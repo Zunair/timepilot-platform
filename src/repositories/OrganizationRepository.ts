@@ -60,6 +60,19 @@ export class OrganizationRepository extends BaseRepository<Organization> {
   }
 
   /**
+   * Find organization by ID without tenant context.
+   * Safe for auth/session org-resolution flows where membership is validated separately.
+   */
+  async findByIdRaw(id: UUID): Promise<Organization | null> {
+    const result = await db(
+      `SELECT ${this.columns.join(', ')} FROM organizations WHERE id = $1`,
+      [id],
+    );
+
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  /**
    * Update organization (admin-level operation)
    */
   async update(
