@@ -226,6 +226,9 @@ ensure_node() {
   fi
 
   log "Installing Node.js ${NODE_MAJOR}.x from NodeSource"
+  # Purge system Node.js packages to avoid dpkg file-overwrite conflicts (e.g. libnode-dev)
+  apt-get purge -y nodejs nodejs-doc libnode-dev 'libnode[0-9]*' 2>/dev/null || true
+  apt-get autoremove -y 2>/dev/null || true
   curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash -
   apt-get install -y nodejs
 }
@@ -273,58 +276,49 @@ clone_or_update_repo() {
   sudo -u "$APP_USER" bash -lc "cd '$app_dir' && npm run migrate"
 }
 
+upsert_env_var() {
+  local file_path="$1"
+  local key="$2"
+  local value="$3"
+  local escaped
+
+  escaped="$(printf '%s' "$value" | sed -e 's/[\\&|]/\\\\&/g')"
+
+  if grep -Eq "^${key}=" "$file_path"; then
+    sed -i -E "s|^${key}=.*|${key}=${escaped}|" "$file_path"
+  else
+    printf '%s=%s\n' "$key" "$value" >> "$file_path"
+  fi
+}
+
 write_env_file() {
   local instance="$1"
   local port="$2"
   local app_dir="$BASE_DIR/$instance"
   local env_file="$ENV_DIR/$instance.env"
+  local template_file="$app_dir/.env.example"
 
   if [[ -f "$env_file" && "$FORCE_ENV" != "true" ]]; then
     log "Keeping existing env file: $env_file"
     return
   fi
 
-  log "Writing env skeleton: $env_file"
-  cat >"$env_file" <<EOF
-# TimePilot instance: $instance
-# Replace placeholder values before first start.
+  [[ -f "$template_file" ]] || die "Missing template file for $instance instance: $template_file"
 
-NODE_ENV=production
-PORT=$port
-API_BASE_URL=http://127.0.0.1:$port
-CLIENT_BASE_URL=http://127.0.0.1:3001
+  log "Writing env file from template $template_file -> $env_file"
+  cp "$template_file" "$env_file"
 
-DATABASE_URL=postgresql://user:password@127.0.0.1:5432/timepilot
-DATABASE_SSL=false
-REDIS_URL=redis://127.0.0.1:6379
-SESSION_SECRET=CHANGE_ME_TO_A_LONG_RANDOM_SECRET
+  upsert_env_var "$env_file" "NODE_ENV" "production"
+  upsert_env_var "$env_file" "PORT" "$port"
+  upsert_env_var "$env_file" "API_BASE_URL" "http://127.0.0.1:$port"
+  upsert_env_var "$env_file" "CLIENT_BASE_URL" "http://127.0.0.1:3001"
 
-# OAuth (optional)
-GOOGLE_CLIENT_ID=
-GOOGLE_CLIENT_SECRET=
-GOOGLE_CALLBACK_URL=http://127.0.0.1:$port/api/auth/google/callback
-APPLE_CLIENT_ID=
-APPLE_CLIENT_SECRET=
-APPLE_CALLBACK_URL=http://127.0.0.1:$port/api/auth/apple/callback
-MICROSOFT_CLIENT_ID=
-MICROSOFT_CLIENT_SECRET=
-MICROSOFT_CALLBACK_URL=http://127.0.0.1:$port/api/auth/microsoft/callback
+  upsert_env_var "$env_file" "GOOGLE_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/google/callback"
+  upsert_env_var "$env_file" "APPLE_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/apple/callback"
+  upsert_env_var "$env_file" "MICROSOFT_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/microsoft/callback"
 
-# Notifications (optional)
-TWILIO_ACCOUNT_SID=
-TWILIO_AUTH_TOKEN=
-TWILIO_PHONE_NUMBER=
-SMTP_HOST=smtp.sendgrid.net
-SMTP_PORT=587
-SMTP_USER=apikey
-SMTP_PASS=
-SMTP_FROM=noreply@example.com
-LOG_LEVEL=info
-
-# Service-specific values
-APP_DIR=$app_dir
-NODE_BIN=/usr/bin/node
-EOF
+  upsert_env_var "$env_file" "APP_DIR" "$app_dir"
+  upsert_env_var "$env_file" "NODE_BIN" "/usr/bin/node"
 
   chown "$APP_USER:$APP_GROUP" "$env_file"
   chmod 640 "$env_file"
@@ -404,7 +398,7 @@ parse_instances() {
 
 contains_placeholder_secrets() {
   local env_file="$1"
-  grep -E '^SESSION_SECRET=CHANGE_ME' "$env_file" >/dev/null 2>&1
+  grep -E '^SESSION_SECRET=(CHANGE_ME|CHANGE_ME_TO_A_LONG_RANDOM_SECRET|your_session_secret_key_change_in_production)$' "$env_file" >/dev/null 2>&1
 }
 
 start_instances() {
