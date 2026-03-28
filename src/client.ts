@@ -446,6 +446,15 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       availabilityMonthKey: null,
       hasAnyAvailability: null,
       selectingOrganization: false,
+      // Admin settings panel
+      settingsOrg: null,      // org being edited in settings panel
+      settingsSaving: false,
+      settingsMessage: null,
+      settingsError: null,
+      profileSaving: false,
+      profileMessage: null,
+      profileError: null,
+      userProfile: null,       // { firstName, lastName, timezone, profileImageUrl }
     };
 
     // ─── API helper ─────────────────────────────────────────────────
@@ -817,6 +826,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         case 'welcome':      app.innerHTML = tmplWelcome();   break;
         case 'admin':        app.innerHTML = tmplAdmin();     break;
         case 'admin-empty':  app.innerHTML = tmplAdminEmpty(); break;
+        case 'admin-settings': app.innerHTML = tmplAdminSettings(); break;
         case 'org-select':   app.innerHTML = tmplOrgSelection(); break;
         case 'no-availability': app.innerHTML = tmplNoAvailability(); break;
         case 'error':        app.innerHTML = tmplError();     break;
@@ -893,17 +903,101 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         var bookingHref = '/?org=' + encodeURIComponent(org.slug)
           + '&user=' + encodeURIComponent(S.userId)
           + '&duration=' + encodeURIComponent(S.duration);
+        var canSettings = org.role === 'owner' || org.role === 'admin';
         return '<div class="org-select-btn">'
           + '<div class="org-select-name">' + esc(org.name) + '</div>'
           + '<div class="org-select-meta">Role: ' + esc(org.role) + ' • ' + esc(org.slug) + '</div>'
           + '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'
           + '<button class="btn btn-ghost" data-org-id="' + esc(org.id) + '" data-org-slug="' + esc(org.slug) + '">Open org</button>'
           + (showBookingLinks
-              ? '<a class="btn btn-ghost" href="' + bookingHref + '">Open booking link</a>'
+              ? '<a class="btn btn-ghost" href="' + bookingHref + '">Booking link</a>'
+              : '')
+          + (canSettings
+              ? '<button class="btn" data-settings-org-id="' + esc(org.id) + '">Settings</button>'
               : '')
           + '</div>'
           + '</div>';
       }).join('');
+    }
+
+    function tmplAdminSettings() {
+      var org = S.settingsOrg;
+      if (!org) return tmplLoading();
+      return '<div class="card">'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">'
+        + '<button class="btn btn-ghost" id="settings-back" style="padding:8px 14px">&#8592; Back</button>'
+        + '<div>'
+        + '<span class="chip">Settings</span>'
+        + '<h2 style="margin:4px 0 0">' + esc(org.name) + '</h2>'
+        + '</div>'
+        + '</div>'
+        // Org Branding
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Organization branding</h3>'
+        + '<form id="settings-org-form">'
+        + '<div class="form-group">'
+        + '<label for="settings-org-name">Name</label>'
+        + '<input id="settings-org-name" name="name" type="text" value="' + esc(org.name || '') + '" placeholder="Acme Studio" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-org-desc">Description</label>'
+        + '<input id="settings-org-desc" name="description" type="text" value="' + esc(org.description || '') + '" placeholder="A short description (shown on booking pages)" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-org-logo">Logo URL</label>'
+        + '<input id="settings-org-logo" name="logoUrl" type="url" value="' + esc(org.logoUrl || '') + '" placeholder="https://example.com/logo.png" />'
+        + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+        + '<div class="form-group">'
+        + '<label for="settings-org-primary">Primary color</label>'
+        + '<input id="settings-org-primary" name="primaryColor" type="color" value="' + esc(org.primaryColor || '#0f766e') + '" style="height:44px;cursor:pointer" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-org-secondary">Secondary color</label>'
+        + '<input id="settings-org-secondary" name="secondaryColor" type="color" value="' + esc(org.secondaryColor || '#d1faf3') + '" style="height:44px;cursor:pointer" />'
+        + '</div>'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-org-font">Font family</label>'
+        + '<select id="settings-org-font" name="fontFamily" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;background:white">'
+        + ['Georgia, serif', 'Arial, sans-serif', '"Helvetica Neue", sans-serif', '"Times New Roman", serif', 'Verdana, sans-serif'].map(function(f) {
+            var val = f.split(',')[0].replace(/"/g,'');
+            var sel = (org.fontFamily && org.fontFamily.split(',')[0].trim() === val) ? ' selected' : '';
+            return '<option value="' + esc(f) + '"' + sel + '>' + esc(val) + '</option>';
+          }).join('')
+        + '</select>'
+        + '</div>'
+        + (S.settingsError ? '<div class="alert-error">' + esc(S.settingsError) + '</div>' : '')
+        + (S.settingsMessage ? '<p style="color:var(--accent);font-weight:600">' + esc(S.settingsMessage) + '</p>' : '')
+        + '<button class="btn" type="submit"' + (S.settingsSaving ? ' disabled' : '') + '>'
+        + (S.settingsSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save branding')
+        + '</button>'
+        + '</form>'
+        // User Profile
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Your profile</h3>'
+        + '<form id="settings-profile-form">'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+        + '<div class="form-group">'
+        + '<label for="settings-first">First name</label>'
+        + '<input id="settings-first" name="firstName" type="text" value="' + esc((S.userProfile && S.userProfile.firstName) || '') + '" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-last">Last name</label>'
+        + '<input id="settings-last" name="lastName" type="text" value="' + esc((S.userProfile && S.userProfile.lastName) || '') + '" />'
+        + '</div>'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-tz">Timezone</label>'
+        + '<input id="settings-tz" name="timezone" type="text" value="' + esc((S.userProfile && S.userProfile.timezone) || S.tz) + '" placeholder="America/New_York" />'
+        + '<p style="margin:4px 0 0;font-size:0.8rem;color:var(--muted)">Use IANA format (e.g. America/New_York, Europe/London, UTC)</p>'
+        + '</div>'
+        + (S.profileError ? '<div class="alert-error">' + esc(S.profileError) + '</div>' : '')
+        + (S.profileMessage ? '<p style="color:var(--accent);font-weight:600">' + esc(S.profileMessage) + '</p>' : '')
+        + '<button class="btn" type="submit"' + (S.profileSaving ? ' disabled' : '') + '>'
+        + (S.profileSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save profile')
+        + '</button>'
+        + '</form>'
+        + '</div>';
     }
 
     function tmplAdmin() {
@@ -1231,9 +1325,90 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       if (e.target.id === 'ref-code') {
         copyRef(e.target); return;
       }
+
+      // Settings panel — back button
+      if (e.target && e.target.id === 'settings-back') {
+        S.step = 'admin';
+        render();
+        return;
+      }
+
+      // Settings panel — open from org card
+      var settingsBtn = e.target && e.target.closest('[data-settings-org-id]');
+      if (settingsBtn) {
+        var settingsOrgId = settingsBtn.getAttribute('data-settings-org-id');
+        var foundOrg = (S.organizations || []).find(function(o) { return o.id === settingsOrgId; });
+        if (!foundOrg) return;
+        S.settingsOrg = foundOrg;
+        S.settingsError = null;
+        S.settingsMessage = null;
+        S.profileError = null;
+        S.profileMessage = null;
+        S.step = 'admin-settings';
+        render();
+        Promise.all([
+          apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
+          apiFetch('/api/users/me'),
+        ]).then(function(results) {
+          S.settingsOrg = results[0].organization || S.settingsOrg;
+          S.userProfile = results[1];
+          render();
+        }).catch(function() { render(); });
+        return;
+      }
     });
 
     document.addEventListener('submit', function(e) {
+      // Org branding / settings form
+      if (e.target && e.target.id === 'settings-org-form') {
+        e.preventDefault();
+        if (S.settingsSaving) return;
+        var sf = e.target;
+        var sb = {
+          name:           sf.querySelector('[name="name"]').value.trim(),
+          description:    sf.querySelector('[name="description"]').value.trim(),
+          logoUrl:        sf.querySelector('[name="logoUrl"]').value.trim(),
+          primaryColor:   sf.querySelector('[name="primaryColor"]').value,
+          secondaryColor: sf.querySelector('[name="secondaryColor"]').value,
+          fontFamily:     sf.querySelector('[name="fontFamily"]').value,
+        };
+        S.settingsSaving = true; S.settingsError = null; S.settingsMessage = null; render();
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/admin/settings', { method: 'PATCH', body: sb })
+          .then(function(updated) {
+            S.settingsOrg = updated;
+            S.organizations = (S.organizations || []).map(function(o) {
+              return o.id === updated.id ? Object.assign({}, o, updated) : o;
+            });
+            S.settingsSaving = false; S.settingsMessage = 'Settings saved!'; render();
+            setTimeout(function() { S.settingsMessage = null; render(); }, 3000);
+          }).catch(function(err) {
+            S.settingsSaving = false; S.settingsError = (err && err.message) || 'Failed to save settings'; render();
+          });
+        return;
+      }
+
+      // User profile form
+      if (e.target && e.target.id === 'settings-profile-form') {
+        e.preventDefault();
+        if (S.profileSaving) return;
+        var pf = e.target;
+        var pb = {
+          firstName: pf.querySelector('[name="firstName"]').value.trim(),
+          lastName:  pf.querySelector('[name="lastName"]').value.trim(),
+          timezone:  pf.querySelector('[name="timezone"]').value.trim(),
+        };
+        S.profileSaving = true; S.profileError = null; S.profileMessage = null; render();
+        apiFetch('/api/users/me', { method: 'PATCH', body: pb })
+          .then(function(updated) {
+            S.userProfile = updated;
+            S.profileSaving = false; S.profileMessage = 'Profile updated!'; render();
+            setTimeout(function() { S.profileMessage = null; render(); }, 3000);
+          }).catch(function(err) {
+            S.profileSaving = false; S.profileError = (err && err.message) || 'Failed to save profile'; render();
+          });
+        return;
+      }
+
       if (e.target && e.target.id === 'create-org-form') {
         e.preventDefault();
         if (S.creatingOrganization) return;
