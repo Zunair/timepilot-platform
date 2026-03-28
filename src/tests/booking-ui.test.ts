@@ -95,7 +95,7 @@ describe('BOOKING_HTML JavaScript SPA', () => {
   it('shows a simple admin workspace view with user id and organizations', () => {
     expect(BOOKING_HTML).toContain('Your workspace');
     expect(BOOKING_HTML).toContain('User ID:');
-    expect(BOOKING_HTML).toContain('Open booking link');
+    expect(BOOKING_HTML).toContain('Booking link');
   });
 
   it('shows a deferred email-scope enable banner after login when Gmail scope is missing', () => {

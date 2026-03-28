@@ -1,3 +1,9 @@
+  - [x] COMPLETED Add opaque booking link generator with QR codes
+    - [x] COMPLETED Create booking_links table migration (migration005 in src/db/migrate.ts)
+    - [x] COMPLETED Build booking links CRUD API (src/routes/booking-links.routes.ts)
+    - [x] COMPLETED Build public token-resolve + QR code API (src/routes/public-booking.routes.ts, /api/b/:token)
+    - [x] COMPLETED Integrate booking links section into admin settings panel (src/client.ts)
+    - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 ## Phase Status
 - State: IN-PROGRESS

@@ -39,6 +39,7 @@ export async function runMigrations(): Promise<void> {
     { name: '002_add_notifications', sql: migration002 },
     { name: '003_oauth_token_lifecycle', sql: migration003 },
     { name: '004_nullable_session_org', sql: migration004 },
+    { name: '005_booking_links', sql: migration005 },
   ];
 
   for (const migration of migrations) {
@@ -268,4 +269,26 @@ const migration003 = `
 const migration004 = `
   ALTER TABLE sessions
     ALTER COLUMN organization_id DROP NOT NULL;
+`;
+
+/**
+ * Migration 005: Booking Links
+ *
+ * Opaque short-token links that map to an org + user without exposing
+ * internal IDs in the URL. Used to generate shareable booking URLs and QR codes.
+ */
+const migration005 = `
+  CREATE TABLE IF NOT EXISTS booking_links (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations (id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    token           VARCHAR(32) NOT NULL UNIQUE,
+    label           VARCHAR(255),
+    is_active       BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+
+  CREATE INDEX idx_booking_links_org_id ON booking_links (organization_id);
+  CREATE INDEX idx_booking_links_token  ON booking_links (token);
 `;

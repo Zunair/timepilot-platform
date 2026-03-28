@@ -455,6 +455,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       profileMessage: null,
       profileError: null,
       userProfile: null,       // { firstName, lastName, timezone, profileImageUrl }
+      // Booking links panel
+      bookingLinks: [],           // [{ id, token, label, userName, bookingUrl, isActive }]
+      bookingLinksLoading: false,
+      linkGenerating: false,
+      linkGenerateError: null,
     };
 
     // ─── API helper ─────────────────────────────────────────────────
@@ -464,6 +469,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       if (opts && opts.method) fetchOpts.method = opts.method;
       if (opts && opts.body)   fetchOpts.body   = JSON.stringify(opts.body);
       return fetch(url, fetchOpts).then(function(r) {
+        if (r.status === 204) return null;
         return r.json().then(function(data) {
           if (!r.ok) throw new Error(data.message || 'Request failed (' + r.status + ')');
           return data;
@@ -485,6 +491,23 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var selectOrg = p.get('selectOrg') === '1';
 
       if (ref)  { loadByRef(ref); return; }
+
+      var bk = p.get('bk');
+      if (bk) {
+        S.step = 'loading'; render();
+        apiFetch('/api/b/' + encodeURIComponent(bk))
+          .then(function(data) {
+            S.userId   = data.userId;
+            S.duration = (isNaN(dur) || dur < 15) ? 60 : dur;
+            loadOrg(data.organizationSlug);
+          })
+          .catch(function() {
+            S.step = 'error';
+            S.error = 'This booking link is invalid or has expired.';
+            render();
+          });
+        return;
+      }
 
       S.duration = (isNaN(dur) || dur < 15) ? 60 : dur;
 
@@ -997,6 +1020,44 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + (S.profileSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save profile')
         + '</button>'
         + '</form>'
+        + '</form>'
+        // ── Booking Links ──────────────────────────────────────────
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">'
+        + '<h3 style="margin:0;font-size:1rem;font-weight:700">Booking links</h3>'
+        + '<button class="btn" id="generate-booking-link"'
+        + (S.linkGenerating ? ' disabled' : '') + '>'
+        + (S.linkGenerating ? '<span class="spinner spinner-sm"></span> Generating…' : '+ Generate link')
+        + '</button>'
+        + '</div>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Share a booking link without exposing your internal IDs. Each link can be revoked at any time.</p>'
+        + (S.linkGenerateError ? '<div class="alert-error">' + esc(S.linkGenerateError) + '</div>' : '')
+        + (S.bookingLinksLoading
+          ? '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading links…</p>'
+          : (S.bookingLinks.length === 0
+            ? '<p style="color:var(--muted);font-size:0.9rem">No booking links yet. Generate one to share with clients.</p>'
+            : S.bookingLinks.map(function(lnk) {
+              return '<div style="border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-bottom:10px">'
+                + '<div style="display:flex;align-items:flex-start;gap:12px">'
+                + '<div style="flex:1;min-width:0">'
+                + (lnk.label ? '<p style="margin:0 0 4px;font-weight:600;font-size:0.9rem">' + esc(lnk.label) + '</p>' : '')
+                + '<p style="margin:0 0 2px;font-size:0.8rem;color:var(--muted)">' + esc(lnk.userName) + '</p>'
+                + '<code style="display:block;background:var(--accent-lite);padding:6px 8px;border-radius:6px;font-size:0.78rem;word-break:break-all;margin:6px 0">' + esc(lnk.bookingUrl) + '</code>'
+                + '</div>'
+                + '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
+                + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem" data-copy-link="' + esc(lnk.bookingUrl) + '">Copy</button>'
+                + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem" data-toggle-qr="' + esc(lnk.token) + '">QR</button>'
+                + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem;color:#dc2626" data-delete-link-id="' + esc(lnk.id) + '">Delete</button>'
+                + '</div>'
+                + '</div>'
+                + '<div id="qr-' + esc(lnk.token) + '" style="display:none;margin-top:10px;text-align:center">'
+                + '<img src="' + window.__TP.api + '/api/b/' + esc(lnk.token) + '/qr" alt="QR code" style="width:160px;height:160px;border:1px solid var(--border);border-radius:8px" />'
+                + '<p style="margin:6px 0 0;font-size:0.75rem;color:var(--muted)">Scan to open booking page</p>'
+                + '</div>'
+                + '</div>';
+              }).join('')
+            )
+          )
         + '</div>';
     }
 
@@ -1328,6 +1389,66 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
+
+              // Booking links — generate
+              if (e.target && e.target.id === 'generate-booking-link') {
+                if (S.linkGenerating || !S.settingsOrg) return;
+                S.linkGenerating = true; S.linkGenerateError = null; render();
+                apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links', {
+                  method: 'POST',
+                  body: { userId: S.userId, label: S.settingsOrg.name + ' booking' },
+                }).then(function(newLink) {
+                  S.bookingLinks = [newLink].concat(S.bookingLinks || []);
+                  S.linkGenerating = false; render();
+                }).catch(function(err) {
+                  S.linkGenerating = false;
+                  S.linkGenerateError = (err && err.message) || 'Failed to generate link';
+                  render();
+                });
+                return;
+              }
+
+              // Booking links — copy URL to clipboard
+              var copyBtn = e.target && e.target.closest('[data-copy-link]');
+              if (copyBtn) {
+                var copyUrl = copyBtn.getAttribute('data-copy-link');
+                if (copyUrl && navigator.clipboard) {
+                  navigator.clipboard.writeText(copyUrl).then(function() {
+                    copyBtn.textContent = 'Copied!';
+                    setTimeout(function() { copyBtn.textContent = 'Copy'; }, 2000);
+                  });
+                }
+                return;
+              }
+
+              // Booking links — toggle QR code visibility
+              var qrBtn = e.target && e.target.closest('[data-toggle-qr]');
+              if (qrBtn) {
+                var qrToken = qrBtn.getAttribute('data-toggle-qr');
+                var qrEl = document.getElementById('qr-' + qrToken);
+                if (qrEl) {
+                  qrEl.style.display = qrEl.style.display === 'none' ? 'block' : 'none';
+                  qrBtn.textContent = qrEl.style.display === 'none' ? 'QR' : 'Hide QR';
+                }
+                return;
+              }
+
+              // Booking links — delete
+              var deleteBtn = e.target && e.target.closest('[data-delete-link-id]');
+              if (deleteBtn) {
+                var deleteLinkId = deleteBtn.getAttribute('data-delete-link-id');
+                if (!S.settingsOrg || !deleteLinkId) return;
+                apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links/' + deleteLinkId, {
+                  method: 'DELETE',
+                }).then(function() {
+                  S.bookingLinks = (S.bookingLinks || []).filter(function(lnk) { return lnk.id !== deleteLinkId; });
+                  render();
+                }).catch(function(err) {
+                  S.linkGenerateError = (err && err.message) || 'Failed to delete link';
+                  render();
+                });
+                return;
+              }
         S.step = 'admin';
         render();
         return;
@@ -1354,6 +1475,30 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           S.userProfile = results[1];
           render();
         }).catch(function() { render(); });
+                S.bookingLinksLoading = true;
+                Promise.all([
+                  apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
+                  apiFetch('/api/users/me'),
+                  apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
+                ]).then(function(results) {
+                  S.settingsOrg = results[0].organization || S.settingsOrg;
+                  S.userProfile = results[1];
+                  S.bookingLinks = results[2] || [];
+                  S.bookingLinksLoading = false;
+                  render();
+                }).catch(function() { S.bookingLinksLoading = false; render(); });
+        S.bookingLinksLoading = true;
+        Promise.all([
+          apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
+          apiFetch('/api/users/me'),
+          apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
+        ]).then(function(results) {
+          S.settingsOrg = results[0].organization || S.settingsOrg;
+          S.userProfile = results[1];
+          S.bookingLinks = results[2] || [];
+          S.bookingLinksLoading = false;
+          render();
+        }).catch(function() { S.bookingLinksLoading = false; render(); });
         return;
       }
     });

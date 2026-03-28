@@ -16,6 +16,8 @@ import { availabilityRouter } from './routes/availability.routes.js';
 import { appointmentsRouter, confirmationRouter } from './routes/appointments.routes.js';
 import { organizationsRouter } from './routes/organizations.routes.js';
 import { userRouter } from './routes/users.routes.js';
+import { bookingLinksRouter } from './routes/booking-links.routes.js';
+import { publicBookingRouter } from './routes/public-booking.routes.js';
 import { startNotificationWorker } from './workers/NotificationWorker.js';
 
 const app = express();
@@ -62,6 +64,8 @@ app.use('/api/appointments/confirm', confirmationRouter);
 app.use('/api/organizations', organizationsRouter);
 app.use('/api/organizations/:organizationId/availability', availabilityRouter);
 app.use('/api/organizations/:organizationId/appointments', appointmentsRouter);
+app.use('/api/organizations/:organizationId/booking-links', bookingLinksRouter);
+app.use('/api/b', publicBookingRouter);
 
 // ============================================================================
 // ERROR HANDLING
