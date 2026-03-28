@@ -45,6 +45,13 @@ export function tenantContextMiddleware(
       res.status(401).json({ error: 'UNAUTHORIZED', message: 'Session expired or invalid' });
       return;
     }
+    if (!payload.organizationId || !payload.role) {
+      res.status(409).json({
+        error: 'ORG_SELECTION_REQUIRED',
+        message: 'Select or create an organization before accessing this resource',
+      });
+      return;
+    }
 
     req.tenant = {
       organizationId: payload.organizationId,
