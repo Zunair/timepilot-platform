@@ -49,12 +49,15 @@ describe('BOOKING_HTML JavaScript SPA', () => {
   it('implements core booking functions', () => {
     expect(BOOKING_HTML).toContain('function loadOrg(');
     expect(BOOKING_HTML).toContain('function loadSlots(');
+    expect(BOOKING_HTML).toContain('function loadMonthAvailability(');
+    expect(BOOKING_HTML).toContain('function ensureInitialAvailability(');
     expect(BOOKING_HTML).toContain('function bookAppointment(');
     expect(BOOKING_HTML).toContain('function loadByRef(');
   });
 
   it('includes all screen templates', () => {
     expect(BOOKING_HTML).toContain('function tmplCalendar(');
+    expect(BOOKING_HTML).toContain('function tmplNoAvailability(');
     expect(BOOKING_HTML).toContain('function tmplSlots(');
     expect(BOOKING_HTML).toContain('function tmplForm(');
     expect(BOOKING_HTML).toContain('function tmplConfirmed(');
@@ -86,6 +89,26 @@ describe('BOOKING_HTML JavaScript SPA', () => {
 
   it('uses en-CA locale trick for YYYY-MM-DD date formatting', () => {
     expect(BOOKING_HTML).toContain("'en-CA'");
+  });
+
+  it('disables calendar days when month availability shows no slots', () => {
+    expect(BOOKING_HTML).toContain('availabilityByDay');
+    expect(BOOKING_HTML).toContain('Object.prototype.hasOwnProperty.call(S.availabilityByDay, ymd)');
+    expect(BOOKING_HTML).toContain('var disabled = past || loadingAvailability || unavailable;');
+    expect(BOOKING_HTML).toContain('cal-cell.unavailable');
+    expect(BOOKING_HTML).toContain("' data-day=\"");
+  });
+
+  it('shows a dedicated no-availability state when no future dates are available', () => {
+    expect(BOOKING_HTML).toContain("case 'no-availability':");
+    expect(BOOKING_HTML).toContain('No available slots available.');
+    expect(BOOKING_HTML).toContain("S.step = 'no-availability';");
+  });
+
+  it('auto-selects and loads the next available date during initial availability bootstrap', () => {
+    expect(BOOKING_HTML).toContain('loadSlots(firstAvailableDay)');
+    expect(BOOKING_HTML).toContain('probe(0)');
+    expect(BOOKING_HTML).toContain('if (offset > 11)');
   });
 
   it('calls history.replaceState after successful booking', () => {
