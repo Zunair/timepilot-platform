@@ -205,9 +205,17 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       border-color: var(--accent);
       color: var(--accent);
     }
+    .cal-cell:hover.unavailable,
+    .cal-cell:hover.loading {
+      background: transparent;
+      border-color: transparent;
+      color: var(--border);
+    }
     .cal-cell.today  { font-weight: 700; border-color: var(--accent); color: var(--accent); }
     .cal-cell.sel    { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
     .cal-cell.past   { color: var(--border); cursor: default; }
+    .cal-cell.unavailable,
+    .cal-cell.loading { color: var(--border); cursor: default; }
     .cal-cell.empty  { cursor: default; pointer-events: none; }
 
     /* ─── Slots ───────────────────────────────────────────────────── */
@@ -379,6 +387,10 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       booking:   null,     // { confirmationRef, clientName, startTime, endTime, timezone }
       error:     null,
       formError: null,
+      availabilityByDay: {},
+      availabilityLoading: false,
+      availabilityMonthKey: null,
+      hasAnyAvailability: null,
     };
 
     // ─── API helper ─────────────────────────────────────────────────
@@ -418,8 +430,164 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     function loadOrg(slug) {
       S.step = 'loading'; render();
       apiFetch('/api/organizations/slug/' + encodeURIComponent(slug))
-        .then(function(org) { S.org = org; S.step = 'calendar'; render(); })
+        .then(function(org) {
+          S.org = org;
+          ensureInitialAvailability();
+        })
         .catch(function()   { S.error = 'Booking page not found. Please check the link.'; S.step = 'error'; render(); });
+    }
+
+    function monthKey(dateObj) {
+      return dateObj.getFullYear() + '-' + String(dateObj.getMonth() + 1).padStart(2, '0');
+    }
+
+    function loadMonthAvailability() {
+      if (!S.org || !S.userId) return;
+
+      var year = S.month.getFullYear();
+      var month = S.month.getMonth();
+      var total = new Date(year, month + 1, 0).getDate();
+      var today = todayYMD();
+      var key = monthKey(S.month);
+
+      S.availabilityMonthKey = key;
+      S.availabilityByDay = {};
+      S.availabilityLoading = true;
+      render();
+
+      var days = [];
+      for (var d = 1; d <= total; d++) {
+        var ymd = buildYMD(year, month, d);
+        if (ymd >= today) days.push(ymd);
+      }
+
+      if (days.length === 0) {
+        S.availabilityLoading = false;
+        render();
+        return;
+      }
+
+      var requests = days.map(function(ymd) {
+        var qs = 'userId='    + encodeURIComponent(S.userId)
+               + '&date='     + encodeURIComponent(ymd)
+               + '&timezone=' + encodeURIComponent(S.tz)
+               + '&duration=' + S.duration;
+        return apiFetch('/api/organizations/' + S.org.id + '/availability/slots?' + qs)
+          .then(function(data) {
+            var slots = (data && data.slots) || [];
+            return { ymd: ymd, available: slots.length > 0 };
+          })
+          .catch(function() {
+            return { ymd: ymd, available: false };
+          });
+      });
+
+      Promise.all(requests).then(function(results) {
+        // Ignore stale responses when user navigates to another month quickly.
+        if (S.availabilityMonthKey !== key) return;
+
+        results.forEach(function(result) {
+          S.availabilityByDay[result.ymd] = result.available;
+        });
+        S.availabilityLoading = false;
+
+        if (S.day && S.day.slice(0, 7) === key && S.availabilityByDay[S.day] === false) {
+          S.day = null;
+          S.slot = null;
+          S.slots = [];
+          if (S.step === 'slots' || S.step === 'slot-loading') {
+            S.step = 'calendar';
+          }
+        }
+
+        render();
+      });
+    }
+
+    function ensureInitialAvailability() {
+      if (!S.org || !S.userId) return;
+
+      var baseMonth = new Date(S.month);
+      baseMonth.setDate(1);
+      baseMonth.setHours(0, 0, 0, 0);
+
+      function probe(offset) {
+        if (offset > 11) {
+          S.hasAnyAvailability = false;
+          S.availabilityLoading = false;
+          S.step = 'no-availability';
+          render();
+          return;
+        }
+
+        var targetMonth = new Date(baseMonth);
+        targetMonth.setMonth(baseMonth.getMonth() + offset);
+        var key = monthKey(targetMonth);
+
+        var year = targetMonth.getFullYear();
+        var month = targetMonth.getMonth();
+        var total = new Date(year, month + 1, 0).getDate();
+        var today = todayYMD();
+        var days = [];
+
+        for (var d = 1; d <= total; d++) {
+          var ymd = buildYMD(year, month, d);
+          if (ymd >= today) days.push(ymd);
+        }
+
+        if (days.length === 0) {
+          probe(offset + 1);
+          return;
+        }
+
+        var requests = days.map(function(ymd) {
+          var qs = 'userId='    + encodeURIComponent(S.userId)
+                 + '&date='     + encodeURIComponent(ymd)
+                 + '&timezone=' + encodeURIComponent(S.tz)
+                 + '&duration=' + S.duration;
+          return apiFetch('/api/organizations/' + S.org.id + '/availability/slots?' + qs)
+            .then(function(data) {
+              var slots = (data && data.slots) || [];
+              return { ymd: ymd, available: slots.length > 0 };
+            })
+            .catch(function() {
+              return { ymd: ymd, available: false };
+            });
+        });
+
+        Promise.all(requests).then(function(results) {
+          var availabilityByDay = {};
+          var firstAvailableDay = null;
+
+          results.forEach(function(result) {
+            availabilityByDay[result.ymd] = result.available;
+            if (!firstAvailableDay && result.available) {
+              firstAvailableDay = result.ymd;
+            }
+          });
+
+          if (!firstAvailableDay) {
+            probe(offset + 1);
+            return;
+          }
+
+          S.hasAnyAvailability = true;
+          S.month = targetMonth;
+          S.availabilityMonthKey = key;
+          S.availabilityByDay = availabilityByDay;
+          S.availabilityLoading = false;
+          S.step = 'calendar';
+          render();
+          loadSlots(firstAvailableDay);
+        }).catch(function() {
+          probe(offset + 1);
+        });
+      }
+
+      S.availabilityLoading = true;
+      S.step = 'loading';
+      render();
+      probe(0);
     }
 
     function loadSlots(day) {
@@ -515,6 +683,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       switch (S.step) {
         case 'loading':      app.innerHTML = tmplLoading();   break;
         case 'welcome':      app.innerHTML = tmplWelcome();   break;
+        case 'no-availability': app.innerHTML = tmplNoAvailability(); break;
         case 'error':        app.innerHTML = tmplError();     break;
         case 'calendar':
         case 'slot-loading':
@@ -571,6 +740,14 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '</div>';
     }
 
+    function tmplNoAvailability() {
+      return '<div class="card center-card">'
+        + '<div class="icon">&#9203;</div>'
+        + '<h2>No available slots available.</h2>'
+        + '<p>Please try again later or contact your host for additional availability.</p>'
+        + '</div>';
+    }
+
     function tmplOrgHeader() {
       var org   = S.org;
       var init  = org.name ? org.name[0].toUpperCase() : '?';
@@ -602,11 +779,18 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       for (var d = 1; d <= total; d++) {
         var ymd  = buildYMD(year, month, d);
         var past = ymd < today;
+        var hasKnownAvailability = Object.prototype.hasOwnProperty.call(S.availabilityByDay, ymd);
+        var available = S.availabilityByDay[ymd] === true;
+        var loadingAvailability = !past && !hasKnownAvailability && S.availabilityLoading;
+        var unavailable = !past && hasKnownAvailability && !available;
+        var disabled = past || loadingAvailability || unavailable;
         var cls  = 'cal-cell'
           + (past          ? ' past'  : '')
+          + (loadingAvailability ? ' loading' : '')
+          + (unavailable ? ' unavailable' : '')
           + (ymd === today ? ' today' : '')
           + (ymd === S.day ? ' sel'   : '');
-        cells += '<div class="' + cls + '"' + (!past ? ' data-day="' + ymd + '"' : '') + '>' + d + '</div>';
+        cells += '<div class="' + cls + '"' + (!disabled ? ' data-day="' + ymd + '"' : '') + '>' + d + '</div>';
       }
 
       var slotsHtml = '';
@@ -754,11 +938,15 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
       if (e.target.id === 'prev-month') {
         S.month.setMonth(S.month.getMonth() - 1);
-        S.day = null; S.slots = []; S.step = 'calendar'; render(); return;
+        S.day = null; S.slots = []; S.step = 'calendar'; render();
+        loadMonthAvailability();
+        return;
       }
       if (e.target.id === 'next-month') {
         S.month.setMonth(S.month.getMonth() + 1);
-        S.day = null; S.slots = []; S.step = 'calendar'; render(); return;
+        S.day = null; S.slots = []; S.step = 'calendar'; render();
+        loadMonthAvailability();
+        return;
       }
       if (e.target.id === 'back-to-slots') {
         S.step = (S.slots && S.slots.length > 0) ? 'slots' : 'calendar';
