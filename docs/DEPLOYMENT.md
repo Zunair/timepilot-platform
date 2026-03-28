@@ -107,6 +107,11 @@ Minimum required values:
 - APP_DIR
 - NODE_BIN
 
+Optional notification values:
+- Leave all `TWILIO_*` variables unset to disable SMS notifications.
+- If you set `TWILIO_ACCOUNT_SID`, it must be a real Twilio Account SID starting with `AC`.
+- Do not leave placeholder values such as `your_twilio_account_sid` in deployed env files. The server now fails fast on invalid Twilio config.
+
 Default port mapping:
 - dev: 9001
 - prod: 9002

@@ -6,11 +6,11 @@ import type { UUID } from '../types/index.js';
 
 const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 
-function hasValue(v?: string | null): v is string {
-  return Boolean(v && v.trim().length > 0);
+function hasValue(v: unknown): v is string {
+  return typeof v === 'string' && v.trim().length > 0;
 }
 
-function hasGmailSendScope(scope?: string): boolean {
+function hasGmailSendScope(scope?: unknown): boolean {
   if (!hasValue(scope)) return false;
   const scopes = scope.split(/\s+/).map((s) => s.trim()).filter(Boolean);
   return scopes.includes(GMAIL_SEND_SCOPE) || scopes.includes('gmail.send');
@@ -23,7 +23,7 @@ function computeAccessTokenExpiry(expiresInSeconds?: number): string | undefined
   return new Date(Date.now() + (expiresInSeconds * 1000)).toISOString();
 }
 
-function hasFreshAccessToken(expiresAt?: string, skewSeconds = 60): boolean {
+function hasFreshAccessToken(expiresAt?: unknown, skewSeconds = 60): boolean {
   if (!hasValue(expiresAt)) return false;
   const expiresAtMs = Date.parse(expiresAt);
   if (Number.isNaN(expiresAtMs)) return false;

@@ -65,6 +65,28 @@ describe('GoogleMailboxService', () => {
     expect(sent).toBe(false);
   });
 
+  it('returns false when linked Google account contains malformed non-string scope data', async () => {
+    vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
+      userId: USER_ID,
+      provider: 'google',
+      providerUserId: 'google-sub-1',
+      accessToken: 'token',
+      refreshToken: 'refresh',
+      scope: { value: 'https://www.googleapis.com/auth/gmail.send' },
+      accessTokenExpiresAt: new Date(Date.now() + 5 * 60 * 1000).toISOString(),
+    } as any);
+
+    const sent = await sendViaGoogleUserMailbox({
+      userId: USER_ID,
+      recipient: 'client@example.com',
+      subject: 'Reminder',
+      html: '<p>Hi</p>',
+    });
+
+    expect(sent).toBe(false);
+    expect(global.fetch).not.toHaveBeenCalled();
+  });
+
   it('refreshes expired token then sends via Gmail API', async () => {
     vi.mocked(oauthAccountRepository.findByUserAndProvider).mockResolvedValue({
       userId: USER_ID,
