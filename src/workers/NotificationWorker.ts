@@ -15,6 +15,7 @@ import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { appointmentRepository } from '../repositories/AppointmentRepository.js';
+import { sendViaGoogleUserMailbox } from '../services/GoogleMailboxService.js';
 import { env } from '../config/env.js';
 import { NotificationChannel, NotificationType } from '../types/index.js';
 import type { Notification, Appointment, UUID } from '../types/index.js';
@@ -169,14 +170,23 @@ async function processOne(notification: Notification): Promise<void> {
 
   try {
     if (notification.channel === NotificationChannel.EMAIL) {
-      if (!transporter) throw new Error('SMTP not configured');
       const { subject, html } = buildEmailContent(appt, notification.type);
-      await transporter.sendMail({
-        from: env.SMTP_FROM ?? 'noreply@timepilot.app',
-        to:   notification.recipient,
+      const sentViaGoogle = await sendViaGoogleUserMailbox({
+        userId: appt.userId,
+        recipient: notification.recipient,
         subject,
         html,
       });
+
+      if (!sentViaGoogle) {
+        if (!transporter) throw new Error('No Google mailbox permission and SMTP not configured');
+        await transporter.sendMail({
+          from: env.SMTP_FROM ?? 'noreply@timepilot.app',
+          to:   notification.recipient,
+          subject,
+          html,
+        });
+      }
     } else {
       const body = buildSMSBody(appt, notification.type);
       await sendSMS(notification.recipient, body);
