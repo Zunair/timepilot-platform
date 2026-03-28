@@ -111,6 +111,10 @@ Minimum required values:
 - APP_DIR
 - NODE_BIN
 
+Migration note:
+- The installer runs `npm run migrate` only when `DATABASE_URL`, `REDIS_URL`, and `SESSION_SECRET` are set.
+- If these are missing, the installer logs a migration skip and continues. After updating env files, rerun the installer to execute migrations.
+
 Optional notification values:
 - Leave all `TWILIO_*` variables unset to disable SMS notifications.
 - If you set `TWILIO_ACCOUNT_SID`, it must be a real Twilio Account SID starting with `AC`.

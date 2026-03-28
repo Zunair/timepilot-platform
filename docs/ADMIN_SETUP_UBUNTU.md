@@ -45,11 +45,11 @@ Custom log path example:
 
 ```bash
 sudo bash scripts/ops/install-ubuntu.sh \
-  --repo-url https://github.com/timepilot/platform.git
+  --repo-url https://github.com/timepilot/platform.git \
   --log-dir /var/log/timepilot/installer
+```
 
 If you use an SSH repo URL and your key is on a non-service login user, pass `--git-user <linux-login-user>` so clone/fetch runs under that account.
-```
 
 Optional branch control:
 
@@ -91,6 +91,7 @@ Required fields include:
 Notes:
 - Default ports are dev=9001 and prod=9002.
 - The installer will not auto-start an instance if SESSION_SECRET still has placeholder content.
+- The installer runs `npm run migrate` only when `DATABASE_URL`, `REDIS_URL`, and `SESSION_SECRET` are set; otherwise it logs a skip and you can rerun after updating env files.
 
 ## Service operations
 

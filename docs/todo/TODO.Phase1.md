@@ -166,6 +166,7 @@
   - [x] COMPLETED Add installer diagnostics logging and failure triage output (scripts/ops/install-ubuntu.sh)
   - [x] COMPLETED Generate instance env files from per-instance .env.example templates (scripts/ops/install-ubuntu.sh)
   - [x] COMPLETED Add SSH-aware git runner selection for sudo installs (scripts/ops/install-ubuntu.sh --git-user)
+  - [x] COMPLETED Run migrations with instance env loading and guarded required-value checks (scripts/ops/install-ubuntu.sh)
   - [x] COMPLETED Document dev/prod service operations and env separation policy (docs/ADMIN_SETUP_UBUNTU.md)
   - [x] COMPLETED Add deployment bootstrap README with GitHub SSH key and clone instructions (docs/DEPLOYMENT.md)
   - [ ] NOT-STARTED Validate installer end-to-end on clean Ubuntu host and capture logs

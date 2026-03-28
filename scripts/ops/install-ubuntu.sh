@@ -341,9 +341,63 @@ clone_or_update_repo() {
 
   log "Building application in $app_dir"
   sudo -u "$APP_USER" bash -lc "cd '$app_dir' && npm run build"
+}
 
-  log "Running database migrations in $app_dir"
-  sudo -u "$APP_USER" bash -lc "cd '$app_dir' && npm run migrate"
+env_value() {
+  local env_file="$1"
+  local key="$2"
+  local value
+
+  value="$(grep -E "^${key}=" "$env_file" | tail -n 1 | cut -d '=' -f2- || true)"
+  value="${value#\"}"
+  value="${value%\"}"
+  value="${value#\'}"
+  value="${value%\'}"
+  printf '%s' "$value"
+}
+
+can_run_migrations() {
+  local env_file="$1"
+  local -a required=("DATABASE_URL" "REDIS_URL" "SESSION_SECRET")
+  local -a missing=()
+
+  for key in "${required[@]}"; do
+    local value
+    value="$(env_value "$env_file" "$key")"
+    if [[ -z "$value" ]]; then
+      missing+=("$key")
+      continue
+    fi
+
+    if [[ "$key" == "SESSION_SECRET" ]]; then
+      if [[ "$value" == "CHANGE_ME" || "$value" == "CHANGE_ME_TO_A_LONG_RANDOM_SECRET" || "$value" == "your_session_secret_key_change_in_production" ]]; then
+        missing+=("$key")
+      fi
+    fi
+  done
+
+  if (( ${#missing[@]} > 0 )); then
+    log "Skipping migrations because required env values are missing in $env_file: ${missing[*]}"
+    return 1
+  fi
+
+  return 0
+}
+
+run_migrations() {
+  local instance="$1"
+  local app_dir="$BASE_DIR/$instance"
+  local env_file="$ENV_DIR/$instance.env"
+
+  [[ -f "$env_file" ]] || die "Missing env file for migrations: $env_file"
+
+  if ! can_run_migrations "$env_file"; then
+    log "Set required values in $env_file, then rerun the installer to execute migrations"
+    return 0
+  fi
+
+  log "Running database migrations in $app_dir using $env_file"
+  sudo -u "$APP_USER" bash -lc "set -a; source '$env_file'; set +a; cd '$app_dir' && npm run migrate"
 }
 
 upsert_env_var() {
@@ -546,6 +600,7 @@ main() {
   for instance in "${instances[@]}"; do
     clone_or_update_repo "$instance" "$(instance_branch "$instance")"
     write_env_file "$instance" "$(instance_port "$instance")"
+    run_migrations "$instance"
   done
 
   install_systemd_template
