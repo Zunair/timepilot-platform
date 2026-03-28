@@ -7,8 +7,8 @@ import { env } from '../config/env.js';
 export interface SessionPayload {
   sessionId:      UUID;
   userId:         UUID;
-  organizationId: UUID;
-  role:           RoleType;
+  organizationId?: UUID;
+  role?:          RoleType;
 }
 
 export class SessionService {
@@ -18,7 +18,7 @@ export class SessionService {
    */
   async create(
     userId: UUID,
-    organizationId: UUID,
+    organizationId?: UUID,
   ): Promise<{ session: Session; cookie: string }> {
     const expiresAt = new Date(Date.now() + env.SESSION_MAX_AGE).toISOString();
     const session = await sessionRepository.create({ userId, organizationId, expiresAt });
@@ -33,12 +33,20 @@ export class SessionService {
 
   /**
    * Validate a session ID and resolve the caller's identity and role.
-   * Returns null when the session does not exist, is expired, or the user
-   * no longer has membership in the associated organization.
+   * Returns null when the session does not exist or is expired.
+   * When no active organization is selected yet, the payload still returns
+   * user identity and leaves organization/role undefined.
    */
   async validate(sessionId: string): Promise<SessionPayload | null> {
     const session = await sessionRepository.findValidById(sessionId as UUID);
     if (!session) return null;
+
+    if (!session.organizationId) {
+      return {
+        sessionId: session.id,
+        userId: session.userId,
+      };
+    }
 
     const membership = await organizationMemberRepository.findByUserAndOrganization(
       session.userId,
