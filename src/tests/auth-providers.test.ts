@@ -73,7 +73,7 @@ describe('oauth provider availability', () => {
     expect(url).toContain('https://accounts.google.com/o/oauth2/v2/auth?');
     expect(url).toContain('client_id=google-client-id');
     expect(url).toContain('redirect_uri=http%3A%2F%2Flocalhost%3A3000%2Fapi%2Fauth%2Fgoogle%2Fcallback');
-    expect(url).toContain('https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send');
+    expect(url).not.toContain('https%3A%2F%2Fwww.googleapis.com%2Fauth%2Fgmail.send');
     expect(url).toContain('state=acme');
   });
 
