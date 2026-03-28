@@ -10,10 +10,10 @@ import { sessionService } from '../services/SessionService.js';
 import { userRepository } from '../repositories/UserRepository.js';
 import { organizationMemberRepository } from '../repositories/OrganizationMemberRepository.js';
 import { organizationRepository } from '../repositories/OrganizationRepository.js';
+import { oauthAccountRepository } from '../repositories/OAuthAccountRepository.js';
+import type { OAuthProviderName } from '../repositories/OAuthAccountRepository.js';
 import { env } from '../config/env.js';
 import type { UUID } from '../types/index.js';
-
-type OAuthProviderName = 'google' | 'apple' | 'microsoft';
 
 type OAuthEnvShape = {
   GOOGLE_CLIENT_ID?: string;
@@ -97,6 +97,16 @@ interface AppleIdentityPayload {
   };
 }
 
+interface OAuthRefreshResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  error?: string;
+  error_description?: string;
+}
+
 export function parseQueryString(value: unknown): string | undefined {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
 }
@@ -116,6 +126,84 @@ function splitDisplayName(fullName?: string): { firstName: string; lastName: str
   if (parts.length === 0) return { firstName: 'User', lastName: '' };
   if (parts.length === 1) return { firstName: parts[0], lastName: '' };
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+function computeAccessTokenExpiry(expiresInSeconds?: number): string | undefined {
+  if (!expiresInSeconds || Number.isNaN(expiresInSeconds) || expiresInSeconds <= 0) {
+    return undefined;
+  }
+
+  return new Date(Date.now() + (expiresInSeconds * 1000)).toISOString();
+}
+
+export function hasFreshAccessToken(expiresAt?: string, skewSeconds = 60): boolean {
+  if (!hasValue(expiresAt)) return false;
+  const expiresAtMs = Date.parse(expiresAt!);
+  if (Number.isNaN(expiresAtMs)) return false;
+
+  return expiresAtMs > (Date.now() + (skewSeconds * 1000));
+}
+
+export function parseOAuthProvider(value: string): OAuthProviderName | null {
+  if (value === 'google' || value === 'apple' || value === 'microsoft') {
+    return value;
+  }
+  return null;
+}
+
+async function refreshProviderAccessToken(
+  provider: OAuthProviderName,
+  refreshToken: string,
+): Promise<OAuthRefreshResponse> {
+  if (provider === 'google') {
+    const body = new URLSearchParams({
+      client_id: env.GOOGLE_CLIENT_ID!,
+      client_secret: env.GOOGLE_CLIENT_SECRET!,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+
+    const response = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+
+    return await response.json() as OAuthRefreshResponse;
+  }
+
+  if (provider === 'apple') {
+    const body = new URLSearchParams({
+      client_id: env.APPLE_CLIENT_ID!,
+      client_secret: env.APPLE_CLIENT_SECRET!,
+      grant_type: 'refresh_token',
+      refresh_token: refreshToken,
+    });
+
+    const response = await fetch('https://appleid.apple.com/auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: body.toString(),
+    });
+
+    return await response.json() as OAuthRefreshResponse;
+  }
+
+  const body = new URLSearchParams({
+    client_id: env.MICROSOFT_CLIENT_ID!,
+    client_secret: env.MICROSOFT_CLIENT_SECRET!,
+    grant_type: 'refresh_token',
+    refresh_token: refreshToken,
+    scope: 'openid profile email User.Read offline_access',
+  });
+
+  const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: body.toString(),
+  });
+
+  return await response.json() as OAuthRefreshResponse;
 }
 
 export function getOrganizationSlugFromOAuthRequest(req: Request): string | undefined {
@@ -170,11 +258,12 @@ export function buildGoogleOAuthAuthorizeUrl(organizationSlug: string, cfg: OAut
     throw new Error('Google OAuth is not configured');
   }
 
+  // Request gmail.send so reminders can be sent from the user's own mailbox.
   const params = new URLSearchParams({
     client_id: cfg.GOOGLE_CLIENT_ID!.trim(),
     redirect_uri: cfg.GOOGLE_CALLBACK_URL!.trim(),
     response_type: 'code',
-    scope: 'openid email profile',
+    scope: 'openid email profile https://www.googleapis.com/auth/gmail.send',
     access_type: 'offline',
     include_granted_scopes: 'true',
     prompt: 'consent',
@@ -266,6 +355,90 @@ authRouter.get('/providers', (_req: Request, res: Response) => {
     },
     enabledProviders,
   });
+});
+
+/**
+ * POST /api/auth/providers/:provider/refresh
+ * Refreshes an expired or near-expiry provider access token for the current user.
+ */
+authRouter.post('/providers/:provider/refresh', async (req: Request, res: Response) => {
+  const provider = parseOAuthProvider(String(req.params.provider || ''));
+  if (!provider) {
+    res.status(400).json({ error: 'BAD_REQUEST', message: 'Unsupported OAuth provider' });
+    return;
+  }
+
+  const sessionId = sessionService.parseSessionId(req.headers.cookie);
+  if (!sessionId) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'No session cookie' });
+    return;
+  }
+
+  const payload = await sessionService.validate(sessionId).catch(() => null);
+  if (!payload) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Session expired or invalid' });
+    return;
+  }
+
+  const oauthAccount = await oauthAccountRepository.findByUserAndProvider(payload.userId, provider);
+  if (!oauthAccount) {
+    res.status(404).json({ error: 'OAUTH_ACCOUNT_NOT_FOUND', message: 'No linked OAuth account for provider' });
+    return;
+  }
+
+  if (hasValue(oauthAccount.accessToken) && hasFreshAccessToken(oauthAccount.accessTokenExpiresAt)) {
+    res.json({
+      provider,
+      accessToken: oauthAccount.accessToken,
+      expiresAt: oauthAccount.accessTokenExpiresAt,
+      refreshed: false,
+    });
+    return;
+  }
+
+  if (!hasValue(oauthAccount.refreshToken)) {
+    res.status(409).json({
+      error: 'OAUTH_REFRESH_NOT_AVAILABLE',
+      message: 'No refresh token is available for this provider account',
+    });
+    return;
+  }
+
+  try {
+    const refreshed = await refreshProviderAccessToken(provider, oauthAccount.refreshToken!);
+    if (!hasValue(refreshed.access_token)) {
+      res.status(502).json({
+        error: 'OAUTH_REFRESH_FAILED',
+        message: refreshed.error_description || refreshed.error || 'Provider did not return a refreshed access token',
+      });
+      return;
+    }
+
+    const expiresAt = computeAccessTokenExpiry(refreshed.expires_in);
+    const updatedAccount = await oauthAccountRepository.upsert({
+      userId: oauthAccount.userId,
+      provider,
+      providerUserId: oauthAccount.providerUserId,
+      accessToken: refreshed.access_token,
+      refreshToken: refreshed.refresh_token,
+      tokenType: refreshed.token_type,
+      scope: refreshed.scope,
+      accessTokenExpiresAt: expiresAt,
+    });
+
+    res.json({
+      provider,
+      accessToken: updatedAccount.accessToken,
+      expiresAt: updatedAccount.accessTokenExpiresAt,
+      refreshed: true,
+    });
+  } catch (error) {
+    console.error('[Auth] OAuth token refresh failed:', error);
+    res.status(502).json({
+      error: 'OAUTH_REFRESH_FAILED',
+      message: 'OAuth token refresh failed',
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -375,6 +548,13 @@ authRouter.get('/google/callback', async (req, res) => {
       lastName,
       profileImageUrl: hasValue(profile.picture) ? profile.picture : undefined,
       organizationSlug,
+      provider: 'google',
+      providerUserId: hasValue(profile.sub) ? profile.sub! : profile.email!,
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      scope: tokenData.scope,
+      accessTokenExpiresAt: computeAccessTokenExpiry(tokenData.expires_in),
     });
   } catch (error) {
     console.error('[Auth] Google OAuth callback failed:', error);
@@ -458,6 +638,12 @@ const handleAppleCallback = async (req: Request, res: Response): Promise<void> =
       firstName: hasValue(appleIdentity.firstName) ? appleIdentity.firstName! : 'Apple',
       lastName: hasValue(appleIdentity.lastName) ? appleIdentity.lastName! : 'User',
       organizationSlug,
+      provider: 'apple',
+      providerUserId: hasValue(claims.sub) ? claims.sub! : email,
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      accessTokenExpiresAt: computeAccessTokenExpiry(tokenData.expires_in),
     });
   } catch (error) {
     console.error('[Auth] Apple callback failed:', error);
@@ -565,6 +751,13 @@ authRouter.get('/microsoft/callback', async (req, res) => {
       firstName,
       lastName,
       organizationSlug,
+      provider: 'microsoft',
+      providerUserId: hasValue(profile.id) ? profile.id! : email,
+      accessToken: tokenData.access_token,
+      refreshToken: tokenData.refresh_token,
+      tokenType: tokenData.token_type,
+      scope: tokenData.scope,
+      accessTokenExpiresAt: computeAccessTokenExpiry(tokenData.expires_in),
     });
   } catch (error) {
     console.error('[Auth] Microsoft callback failed:', error);
@@ -587,6 +780,13 @@ export async function handleOAuthLogin(
     lastName: string;
     profileImageUrl?: string;
     organizationSlug: string; // The org the user is logging into
+    provider: OAuthProviderName;
+    providerUserId: string;
+    accessToken?: string;
+    refreshToken?: string;
+    tokenType?: string;
+    scope?: string;
+    accessTokenExpiresAt?: string;
   },
 ): Promise<void> {
   // Upsert user by email
@@ -615,6 +815,17 @@ export async function handleOAuthLogin(
     res.status(403).json({ error: 'NOT_A_MEMBER', message: 'User is not a member of this organization' });
     return;
   }
+
+  await oauthAccountRepository.upsert({
+    userId: user.id,
+    provider: profile.provider,
+    providerUserId: profile.providerUserId,
+    accessToken: profile.accessToken,
+    refreshToken: profile.refreshToken,
+    tokenType: profile.tokenType,
+    scope: profile.scope,
+    accessTokenExpiresAt: profile.accessTokenExpiresAt,
+  });
 
   const { cookie } = await sessionService.create(user.id, org.id);
   res.setHeader('Set-Cookie', cookie);

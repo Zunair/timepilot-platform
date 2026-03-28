@@ -25,12 +25,12 @@
   - [x] COMPLETED Build org member management system (src/repositories/OrganizationMemberRepository.ts)
 
 ## Authentication & Authorization
-- [ ] NOT-STARTED Implement social login with OAuth/OIDC
-  - [ ] NOT-STARTED Google OAuth integration
-  - [ ] NOT-STARTED Apple Sign-In integration
-  - [ ] NOT-STARTED Microsoft OAuth integration
-  - [ ] NOT-STARTED Handle OAuth token refresh and expiry
-  - [ ] NOT-STARTED Create user profile from OAuth claims
+- [ ] IN-PROGRESS Implement social login with OAuth/OIDC
+  - [x] COMPLETED Google OAuth integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
+  - [x] COMPLETED Apple Sign-In integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
+  - [x] COMPLETED Microsoft OAuth integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
+  - [x] COMPLETED Handle OAuth token refresh and expiry (token lifecycle persistence + /api/auth/providers/:provider/refresh endpoint with integration tests)
+  - [x] COMPLETED Create user profile from OAuth claims (handleOAuthLogin user upsert in src/routes/auth.routes.ts)
 
 - [x] COMPLETED Build session management system
   - [x] COMPLETED Implement secure session storage (src/repositories/SessionRepository.ts, sessions DB table)
@@ -48,9 +48,9 @@
 
 - [x] COMPLETED Implement appointment management
   - [x] COMPLETED Create appointment creation and validation (AppointmentService.create + slot guard)
-  - [ ] NOT-STARTED Build appointment modification system
+  - [x] COMPLETED Build appointment modification system (AppointmentService.updateDetails + PATCH /appointments/:id)
   - [x] COMPLETED Implement appointment cancellation with recovery (AppointmentService.cancel)
-  - [ ] NOT-STARTED Add appointment rescheduling
+  - [x] COMPLETED Add appointment rescheduling (AppointmentService.reschedule + POST /appointments/:id/reschedule)
 
 ## Client Booking Interface
 - [x] COMPLETED Build client-facing booking experience
@@ -97,6 +97,11 @@
   - [x] COMPLETED Implement retry logic with exponential backoff (nextRetryAt = min(2^n × 60s, 16min))
   - [ ] NOT-STARTED Add dead-letter queue for failed notifications (max 5 attempts, then abandoned)
 
+- [ ] IN-PROGRESS Add provider mailbox sending (Google first)
+  - [x] COMPLETED Request Gmail send scope during Google OAuth with explicit user-facing purpose notice
+  - [x] COMPLETED Add Google mailbox send path in notification worker with SMTP fallback
+  - [ ] NOT-STARTED Add end-to-end worker tests for Google mailbox delivery and fallback behavior
+
 ## Backend Persistence
 - [x] COMPLETED Set up database schema (src/db/migrate.ts)
   - [x] COMPLETED Create all entities with proper relationships
@@ -124,10 +129,10 @@
   - [x] COMPLETED Test RBAC enforcement (src/tests/rbac.test.ts, 10 tests)
   - [ ] NOT-STARTED Test notification queue processing (worker integration test pending)
 
-- [ ] NOT-STARTED Write integration tests
+- [ ] IN-PROGRESS Write integration tests
   - [ ] NOT-STARTED Test full booking flow end-to-end
   - [x] COMPLETED Test multi-tenant isolation (src/tests/tenant-isolation.test.ts, 9 tests)
-  - [ ] NOT-STARTED Test OAuth integration
+  - [x] COMPLETED Test OAuth integration (provider helper tests + callback route integration tests in src/tests/auth-providers.test.ts and src/tests/auth-callbacks.integration.test.ts)
   - [ ] NOT-STARTED Test timezone handling across system
 
 - [x] COMPLETED Test DST boundary behavior

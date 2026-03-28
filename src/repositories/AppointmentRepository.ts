@@ -76,6 +76,15 @@ export class AppointmentRepository extends BaseRepository<Appointment> {
     return result.rows.map(row => this.mapRow(row));
   }
 
+  async findByIdScoped(id: UUID, tenant: TenantContext): Promise<Appointment | null> {
+    const result = await db(
+      `SELECT ${this.columns.join(', ')} FROM appointments
+       WHERE id = $1 AND organization_id = $2`,
+      [id, tenant.organizationId],
+    );
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
   /**
    * Find scheduled appointments that overlap the given UTC time range.
    * Used to detect booking conflicts before creating a new appointment.
@@ -114,6 +123,106 @@ export class AppointmentRepository extends BaseRepository<Appointment> {
       [id, tenant.organizationId],
     );
     if ((result.rowCount ?? 0) === 0) throw new Error('Appointment not found');
+    return this.mapRow(result.rows[0]);
+  }
+
+  async updateDetails(
+    id: UUID,
+    tenant: TenantContext,
+    data: {
+      clientName?: string;
+      clientEmail?: string;
+      clientPhone?: string;
+      notes?: string;
+      timezone?: string;
+    },
+  ): Promise<Appointment> {
+    const updates: string[] = [];
+    const values: unknown[] = [];
+    let i = 1;
+
+    if (typeof data.clientName === 'string') {
+      updates.push(`client_name = $${i++}`);
+      values.push(data.clientName);
+    }
+    if (typeof data.clientEmail === 'string') {
+      updates.push(`client_email = $${i++}`);
+      values.push(data.clientEmail);
+    }
+    if (typeof data.clientPhone === 'string') {
+      updates.push(`client_phone = $${i++}`);
+      values.push(data.clientPhone || null);
+    }
+    if (typeof data.notes === 'string') {
+      updates.push(`notes = $${i++}`);
+      values.push(data.notes || null);
+    }
+    if (typeof data.timezone === 'string') {
+      updates.push(`timezone = $${i++}`);
+      values.push(data.timezone);
+    }
+
+    if (updates.length === 0) {
+      throw Object.assign(new Error('No appointment fields were provided to update'), {
+        code: 'BAD_REQUEST',
+        statusCode: 400,
+      });
+    }
+
+    values.push(id, tenant.organizationId);
+
+    const result = await db(
+      `UPDATE appointments
+       SET ${updates.join(', ')}, updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${i++} AND organization_id = $${i++} AND status = 'scheduled'
+       RETURNING ${this.columns.join(', ')}`,
+      values,
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw Object.assign(new Error('Appointment not found or not in a modifiable state'), {
+        code: 'APPOINTMENT_NOT_MODIFIABLE',
+        statusCode: 409,
+      });
+    }
+
+    return this.mapRow(result.rows[0]);
+  }
+
+  async reschedule(
+    id: UUID,
+    tenant: TenantContext,
+    data: { startTime: string; endTime: string; timezone?: string },
+  ): Promise<Appointment> {
+    const values: unknown[] = [data.startTime, data.endTime];
+    let timezoneSql = '';
+    if (typeof data.timezone === 'string') {
+      timezoneSql = ', timezone = $3';
+      values.push(data.timezone);
+    }
+
+    values.push(id, tenant.organizationId);
+    const idIndex = values.length - 1;
+    const orgIndex = values.length;
+
+    const result = await db(
+      `UPDATE appointments
+       SET start_time = $1,
+           end_time = $2
+           ${timezoneSql},
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $${idIndex} AND organization_id = $${orgIndex} AND status = 'scheduled'
+       RETURNING ${this.columns.join(', ')}`,
+      values,
+    );
+
+    if ((result.rowCount ?? 0) === 0) {
+      throw Object.assign(new Error('Appointment not found or not in a reschedulable state'), {
+        code: 'APPOINTMENT_NOT_RESCHEDULABLE',
+        statusCode: 409,
+      });
+    }
+
     return this.mapRow(result.rows[0]);
   }
 

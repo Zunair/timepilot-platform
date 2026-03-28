@@ -18,6 +18,24 @@ export interface CreateAppointmentParams {
   tenant:         TenantContext;
 }
 
+export interface UpdateAppointmentDetailsParams {
+  appointmentId: UUID;
+  clientName?: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  notes?: string;
+  timezone?: string;
+  tenant: TenantContext;
+}
+
+export interface RescheduleAppointmentParams {
+  appointmentId: UUID;
+  startTime: string; // UTC ISO
+  endTime: string; // UTC ISO
+  timezone?: string;
+  tenant: TenantContext;
+}
+
 export class AppointmentService {
   /**
    * Book a new appointment.
@@ -66,6 +84,66 @@ export class AppointmentService {
       .catch(err => console.error('[AppointmentService] cancellation notification failed:', err));
 
     return appointment;
+  }
+
+  async updateDetails(params: UpdateAppointmentDetailsParams): Promise<Appointment> {
+    const existing = await appointmentRepository.findByIdScoped(params.appointmentId, params.tenant);
+    if (!existing) {
+      throw Object.assign(new Error('Appointment not found'), {
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+    if (existing.status !== 'scheduled') {
+      throw Object.assign(new Error('Only scheduled appointments can be modified'), {
+        code: 'APPOINTMENT_NOT_MODIFIABLE',
+        statusCode: 409,
+      });
+    }
+
+    return appointmentRepository.updateDetails(params.appointmentId, params.tenant, {
+      clientName: params.clientName,
+      clientEmail: params.clientEmail,
+      clientPhone: params.clientPhone,
+      notes: params.notes,
+      timezone: params.timezone,
+    });
+  }
+
+  async reschedule(params: RescheduleAppointmentParams): Promise<Appointment> {
+    const existing = await appointmentRepository.findByIdScoped(params.appointmentId, params.tenant);
+    if (!existing) {
+      throw Object.assign(new Error('Appointment not found'), {
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      });
+    }
+    if (existing.status !== 'scheduled') {
+      throw Object.assign(new Error('Only scheduled appointments can be rescheduled'), {
+        code: 'APPOINTMENT_NOT_RESCHEDULABLE',
+        statusCode: 409,
+      });
+    }
+
+    const available = await schedulingService.isSlotAvailable({
+      userId: existing.userId,
+      startTime: params.startTime,
+      endTime: params.endTime,
+      tenant: params.tenant,
+      excludeAppointmentId: existing.id,
+    });
+    if (!available) {
+      throw Object.assign(new Error('The requested time slot is no longer available'), {
+        code: 'SLOT_UNAVAILABLE',
+        statusCode: 409,
+      });
+    }
+
+    return appointmentRepository.reschedule(params.appointmentId, params.tenant, {
+      startTime: params.startTime,
+      endTime: params.endTime,
+      timezone: params.timezone,
+    });
   }
 
   async getByConfirmationRef(ref: string): Promise<Appointment | null> {

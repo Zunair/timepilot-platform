@@ -140,3 +140,78 @@ appointmentsRouter.post(
     res.json(appointment);
   },
 );
+
+/** PATCH /api/organizations/:organizationId/appointments/:id */
+appointmentsRouter.patch(
+  '/:id',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN, RoleType.MEMBER),
+  async (req: Request, res: Response) => {
+    const tenant = req.tenant!;
+    const { clientName, clientEmail, clientPhone, notes, timezone } = req.body as Record<string, unknown>;
+
+    if (
+      typeof clientName !== 'string' &&
+      typeof clientEmail !== 'string' &&
+      typeof clientPhone !== 'string' &&
+      typeof notes !== 'string' &&
+      typeof timezone !== 'string'
+    ) {
+      res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: 'At least one updatable field is required',
+      });
+      return;
+    }
+
+    if (typeof timezone === 'string' && !isValidTimezone(timezone)) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Invalid IANA timezone' });
+      return;
+    }
+
+    const appointment = await appointmentService.updateDetails({
+      appointmentId: req.params.id as UUID,
+      clientName: typeof clientName === 'string' ? clientName : undefined,
+      clientEmail: typeof clientEmail === 'string' ? clientEmail : undefined,
+      clientPhone: typeof clientPhone === 'string' ? clientPhone : undefined,
+      notes: typeof notes === 'string' ? notes : undefined,
+      timezone: typeof timezone === 'string' ? timezone : undefined,
+      tenant,
+    });
+
+    res.json(appointment);
+  },
+);
+
+/** POST /api/organizations/:organizationId/appointments/:id/reschedule */
+appointmentsRouter.post(
+  '/:id/reschedule',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN, RoleType.MEMBER),
+  async (req: Request, res: Response) => {
+    const tenant = req.tenant!;
+    const { startTime, endTime, timezone } = req.body as Record<string, unknown>;
+
+    if (typeof startTime !== 'string' || typeof endTime !== 'string') {
+      res.status(400).json({
+        error: 'BAD_REQUEST',
+        message: 'startTime and endTime are required',
+      });
+      return;
+    }
+    if (typeof timezone === 'string' && !isValidTimezone(timezone)) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Invalid IANA timezone' });
+      return;
+    }
+
+    const appointment = await appointmentService.reschedule({
+      appointmentId: req.params.id as UUID,
+      startTime,
+      endTime,
+      timezone: typeof timezone === 'string' ? timezone : undefined,
+      tenant,
+    });
+
+    res.json(appointment);
+  },
+);

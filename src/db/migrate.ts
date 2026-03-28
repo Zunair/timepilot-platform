@@ -37,6 +37,7 @@ export async function runMigrations(): Promise<void> {
   const migrations = [
     { name: '001_initial_schema', sql: migration001 },
     { name: '002_add_notifications', sql: migration002 },
+    { name: '003_oauth_token_lifecycle', sql: migration003 },
   ];
 
   for (const migration of migrations) {
@@ -233,4 +234,26 @@ const migration002 = `
   CREATE INDEX idx_notifications_appointment_id ON notifications (appointment_id);
   CREATE INDEX idx_notifications_status ON notifications (status);
   CREATE INDEX idx_notifications_next_retry_at ON notifications (next_retry_at);
+`;
+
+/**
+ * Migration 003: OAuth Token Lifecycle Support
+ *
+ * Adds token and expiry tracking so OAuth refresh/expiry handling
+ * can be persisted and reused across sessions.
+ */
+const migration003 = `
+  ALTER TABLE oauth_accounts
+    ADD COLUMN IF NOT EXISTS access_token TEXT,
+    ADD COLUMN IF NOT EXISTS refresh_token TEXT,
+    ADD COLUMN IF NOT EXISTS token_type VARCHAR(100),
+    ADD COLUMN IF NOT EXISTS scope TEXT,
+    ADD COLUMN IF NOT EXISTS access_token_expires_at TIMESTAMP WITH TIME ZONE,
+    ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL;
+
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_oauth_accounts_user_provider
+    ON oauth_accounts (user_id, provider);
+
+  CREATE INDEX IF NOT EXISTS idx_oauth_accounts_expiry
+    ON oauth_accounts (access_token_expires_at);
 `;

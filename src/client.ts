@@ -360,6 +360,12 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       font-size: 0.92rem;
     }
     .sso-btn:hover { border-color: var(--accent); background: var(--accent-lite); }
+    .sso-note {
+      margin: 8px 0 0;
+      font-size: 0.82rem;
+      color: var(--muted);
+      line-height: 1.4;
+    }
   </style>
 </head>
 <body>
@@ -707,7 +713,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var orgQuery = orgSlug ? ('?org=' + encodeURIComponent(orgSlug)) : '';
 
       if (providers.google) {
-        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/google/callback' + orgQuery + '">Continue with Google</a>');
+        buttons.push('<a class="sso-btn" id="google-sso-btn" href="' + window.__TP.api + '/api/auth/google/callback' + orgQuery + '">Continue with Google</a>');
       }
       if (providers.apple) {
         buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/apple/callback' + orgQuery + '">Continue with Apple</a>');
@@ -720,6 +726,9 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         ? '<div class="sso-section">'
           + '<p class="sso-title">Sign in with SSO</p>'
           + '<div class="sso-buttons">' + buttons.join('') + '</div>'
+          + (providers.google
+              ? '<p class="sso-note">Google sign-in requests Gmail send permission so TimePilot can send reminders from your own mailbox to your clients.</p>'
+              : '')
           + '</div>'
         : '';
 
@@ -927,6 +936,14 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
     // ─── Event delegation (registered once at startup) ───────────────
     document.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'google-sso-btn') {
+        var proceed = window.confirm('TimePilot will request Gmail send permission to send client reminders from your Google mailbox. Continue?');
+        if (!proceed) {
+          e.preventDefault();
+          return;
+        }
+      }
+
       var dayEl = e.target.closest('[data-day]');
       if (dayEl) { loadSlots(dayEl.getAttribute('data-day')); return; }
 
