@@ -14,6 +14,13 @@ import { UUID, OrganizationMember, RoleType, TenantContext } from '../types/inde
 import { query as db } from '../config/db.js';
 import { BaseRepository } from './BaseRepository.js';
 
+export interface UserOrganizationMembership {
+  organizationId: UUID;
+  organizationSlug: string;
+  organizationName: string;
+  role: RoleType;
+}
+
 export class OrganizationMemberRepository extends BaseRepository<OrganizationMember> {
   protected tableName = 'organization_members';
   protected columns = [
@@ -75,6 +82,32 @@ export class OrganizationMemberRepository extends BaseRepository<OrganizationMem
     );
 
     return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  /**
+   * List all organizations a user belongs to.
+   * Used after identity-first login to resolve org routing/selection.
+   */
+  async findOrganizationsForUser(userId: UUID): Promise<UserOrganizationMembership[]> {
+    const result = await db(
+      `SELECT
+         om.organization_id,
+         om.role,
+         o.slug AS organization_slug,
+         o.name AS organization_name
+       FROM organization_members om
+       INNER JOIN organizations o ON o.id = om.organization_id
+       WHERE om.user_id = $1
+       ORDER BY o.name ASC`,
+      [userId],
+    );
+
+    return result.rows.map((row) => ({
+      organizationId: row.organization_id as UUID,
+      organizationSlug: row.organization_slug as string,
+      organizationName: row.organization_name as string,
+      role: row.role as RoleType,
+    }));
   }
 
   /**
