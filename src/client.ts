@@ -911,9 +911,12 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + tmplEmailBanner()
         + '<span class="chip">Admin</span>'
         + '<h2>Your workspace</h2>'
-        + '<p>User ID: <strong>' + esc(S.userId) + '</strong></p>'
-        + '<p>Your organizations are listed below. Settings UI will come later.</p>'
+        + '<p><strong style="font-size:0.95rem">User ID:</strong> <code style="display:block;background:var(--accent-lite);padding:8px;border-radius:6px;margin-top:4px;font-family:monospace;font-size:0.85rem">' + esc(S.userId) + '</code></p>'
+        + '<p style="margin-top:20px;color:var(--muted)">Manage your organizations below. Use the settings panel for team management, schedule configuration, and branding.</p>'
         + '<div class="org-select-list">' + tmplAdminOrgList(true) + '</div>'
+        + '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">'
+        + '<p style="font-size:0.88rem;color:var(--muted)">Need help? <a href="' + window.__TP.api + '/api/auth/logout" style="color:var(--accent)">Sign out</a></p>'
+        + '</div>'
         + '</div>';
     }
 

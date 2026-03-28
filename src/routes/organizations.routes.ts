@@ -163,3 +163,87 @@ organizationsRouter.delete(
     res.status(204).send();
   },
 );
+
+// ---------------------------------------------------------------------------
+// Admin Dashboard & Settings
+// ---------------------------------------------------------------------------
+
+/** GET /api/organizations/:organizationId/admin/dashboard
+ * Returns statistics and info for the admin panel
+ */
+organizationsRouter.get(
+  '/:organizationId/admin/dashboard',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN),
+  async (req: Request, res: Response) => {
+    const org = await organizationRepository.findById(
+      req.params.organizationId as UUID,
+      req.tenant!,
+    );
+    if (!org) {
+      res.status(404).json({ error: 'NOT_FOUND', message: 'Organization not found' });
+      return;
+    }
+
+    const members = await organizationMemberRepository.findByOrganization(
+      req.params.organizationId as UUID,
+      req.tenant!,
+    );
+
+    res.json({
+      organization: org,
+      members: members,
+      stats: {
+        totalMembers: members.length,
+        admins: members.filter(m => m.role === RoleType.ADMIN || m.role === RoleType.OWNER).length,
+        createdAt: org.createdAt,
+      },
+    });
+  },
+);
+
+/** PATCH /api/organizations/:organizationId/admin/settings
+ * Update organization settings (branding, name, description)
+ */
+organizationsRouter.patch(
+  '/:organizationId/admin/settings',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN),
+  async (req: Request, res: Response) => {
+    const {
+      name,
+      description,
+      logoUrl,
+      primaryColor,
+      secondaryColor,
+      fontFamily,
+    } = req.body as {
+      name?: string;
+      description?: string;
+      logoUrl?: string;
+      primaryColor?: string;
+      secondaryColor?: string;
+      fontFamily?: string;
+    };
+
+    const updates: Record<string, unknown> = {};
+    if (name !== undefined) updates.name = name;
+    if (description !== undefined) updates.description = description;
+    if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+    if (primaryColor !== undefined) updates.primaryColor = primaryColor;
+    if (secondaryColor !== undefined) updates.secondaryColor = secondaryColor;
+    if (fontFamily !== undefined) updates.fontFamily = fontFamily;
+
+    if (Object.keys(updates).length === 0) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'No valid fields to update' });
+      return;
+    }
+
+    const org = await organizationRepository.update(
+      req.params.organizationId as UUID,
+      updates as never,
+      req.tenant!,
+    );
+    res.json(org);
+  },
+);

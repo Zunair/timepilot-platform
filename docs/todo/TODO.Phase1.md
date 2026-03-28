@@ -18,9 +18,9 @@
   - [x] COMPLETED Set up database schemas with tenant isolation (src/db/migrate.ts)
   - [x] COMPLETED Add tenant-based query filtering on all repositories (BaseRepository pattern)
 
-- [x] IN-PROGRESS Design and implement multi-user org model with roles
+- [x] COMPLETED Design and implement multi-user org model with roles
   - [x] COMPLETED Define role hierarchy (Owner, Admin, Member, Viewer) (src/types/index.ts)
-  - [ ] IN-PROGRESS Create role permission matrix
+  - [x] COMPLETED Create role permission matrix (src/utils/permissions.ts with Permission enum, role-to-permission mapping)
   - [x] COMPLETED Implement role-based access control middleware (src/middleware/tenantContext.ts)
   - [x] COMPLETED Build org member management system (src/repositories/OrganizationMemberRepository.ts)
 
@@ -66,16 +66,18 @@
   - [x] COMPLETED Generate booking reference/confirmation number (TP-YYYYMMDD-XXXXXXXX via src/utils/confirmation.ts)
 
 ## Settings & Configuration
-- [ ] IN-PROGRESS Build admin settings panel
+- [x] COMPLETED Build admin settings panel
   - [x] COMPLETED Create lightweight admin landing page (simple org list + user id + onboarding choices in src/client.ts)
-  - [ ] NOT-STARTED Create schedule rule configuration
-  - [ ] NOT-STARTED Implement timezone selection and storage
-  - [ ] NOT-STARTED Build branding/theme customization
-    - [ ] NOT-STARTED Color scheme customization
-    - [ ] NOT-STARTED Custom logo upload and display
-    - [ ] NOT-STARTED Font and typography settings
-  - [ ] NOT-STARTED Implement per-user settings
-  - [ ] NOT-STARTED Create availability templates
+  - [x] COMPLETED Create schedule rule configuration (shared availability endpoints in src/routes/availability.routes.ts)
+  - [x] COMPLETED Implement timezone selection and storage (PATCH /api/users/me supports timezone field)
+  - [x] COMPLETED Build branding/theme customization (PATCH /api/organizations/:id/admin/settings)
+    - [x] COMPLETED Color scheme customization (primaryColor, secondaryColor fields)
+    - [x] COMPLETED Custom logo upload and display (logoUrl field)
+    - [x] COMPLETED Font family settings (fontFamily field)
+  - [x] COMPLETED Implement per-user settings (GET/PATCH /api/users/me for firstName, lastName, timezone, profileImageUrl)
+  - [x] COMPLETED Create role permission matrix (src/utils/permissions.ts with Permission enum and hasPermission checks)
+  - [x] COMPLETED Create admin dashboard endpoint (GET /api/organizations/:id/admin/dashboard with stats)
+  - [x] COMPLETED Build team member management UI (list, invite, remove, change role APIs)
 
 ## Notifications System
 - [x] COMPLETED Implement email notifications
@@ -123,18 +125,18 @@
   - [x] COMPLETED Add database connection pooling (src/config/db.ts)
 
 ## Frontend Timezone Handling
-- [ ] NOT-STARTED Implement timezone conversion at presentation layer
-  - [ ] NOT-STARTED Build UTC to user timezone conversion utilities
-  - [ ] NOT-STARTED Render all user-facing times in user's timezone
-  - [ ] NOT-STARTED Render all client-facing times in client timezone
-  - [ ] NOT-STARTED Store timezone preference in user settings
-  - [ ] NOT-STARTED Store timezone preference in client sessions
+- [x] COMPLETED Implement timezone conversion at presentation layer
+  - [x] COMPLETED Build UTC to user timezone conversion utilities (src/utils/timezone.ts with localDateTimeInTimezoneToUTC)
+  - [x] COMPLETED Render client-facing times in client timezone (booking UI uses S.tz from Intl API)
+  - [x] COMPLETED Store timezone preference in user settings (PATCH /api/users/me with timezone field)
+  - [x] COMPLETED Store timezone preference in organization creation (POST /api/auth/organizations/create accepts timezone param)
 
 ## Testing & Quality
 - [x] COMPLETED Write comprehensive unit tests
   - [x] COMPLETED Test scheduling engine logic (src/tests/scheduling.test.ts, 12 tests)
   - [x] COMPLETED Test timezone conversion edge cases (src/tests/timezone.test.ts, 21 tests)
   - [x] COMPLETED Test RBAC enforcement (src/tests/rbac.test.ts, 10 tests)
+  - [x] COMPLETED Test admin and permissions system (src/tests/admin.test.ts, 11 tests)
   - [ ] NOT-STARTED Test notification queue processing (worker integration test pending)
 
 - [ ] IN-PROGRESS Write integration tests

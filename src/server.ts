@@ -15,6 +15,7 @@ import { authRouter } from './routes/auth.routes.js';
 import { availabilityRouter } from './routes/availability.routes.js';
 import { appointmentsRouter, confirmationRouter } from './routes/appointments.routes.js';
 import { organizationsRouter } from './routes/organizations.routes.js';
+import { userRouter } from './routes/users.routes.js';
 import { startNotificationWorker } from './workers/NotificationWorker.js';
 
 const app = express();
@@ -56,6 +57,7 @@ app.get('/health', (req, res) => {
 // ============================================================================
 
 app.use('/api/auth', authRouter);
+app.use('/api/users', userRouter);
 app.use('/api/appointments/confirm', confirmationRouter);
 app.use('/api/organizations', organizationsRouter);
 app.use('/api/organizations/:organizationId/availability', availabilityRouter);
