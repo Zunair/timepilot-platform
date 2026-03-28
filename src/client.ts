@@ -15,10 +15,20 @@ import { env } from './config/env.js';
 
 const clientPort = Number(new URL(env.CLIENT_BASE_URL).port || 3001);
 
+function hasValue(v?: string): boolean {
+  return Boolean(v && v.trim().length > 0);
+}
+
 // Server-side values injected into the browser once at page load.
 const SERVER_CONFIG = JSON.stringify({
   api:   env.API_BASE_URL,
   isDev: env.NODE_ENV !== 'production',
+  oauthProviders: {
+    // UI visibility rule: show provider button only when its client ID is configured.
+    google: hasValue(env.GOOGLE_CLIENT_ID),
+    apple: hasValue(env.APPLE_CLIENT_ID),
+    microsoft: hasValue(env.MICROSOFT_CLIENT_ID),
+  },
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -316,6 +326,32 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     /* ─── Center Card (welcome / error) ──────────────────────────── */
     .center-card { text-align: center; padding: 48px 32px; }
     .center-card .icon { font-size: 3rem; margin-bottom: 16px; }
+
+    .sso-section { margin-top: 24px; }
+    .sso-title {
+      margin: 0 0 10px;
+      font-size: 0.75rem;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: var(--muted);
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+    }
+    .sso-buttons { display: grid; gap: 10px; max-width: 320px; margin: 0 auto; }
+    .sso-btn {
+      display: inline-flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      background: #fff;
+      text-decoration: none;
+      transition: border-color 0.15s, background 0.15s;
+      font-size: 0.92rem;
+    }
+    .sso-btn:hover { border-color: var(--accent); background: var(--accent-lite); }
   </style>
 </head>
 <body>
@@ -496,10 +532,33 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     }
 
     function tmplWelcome() {
+      var providers = (window.__TP && window.__TP.oauthProviders) || {};
+      var buttons = [];
+      var orgSlug = new URLSearchParams(location.search).get('org');
+      var orgQuery = orgSlug ? ('?org=' + encodeURIComponent(orgSlug)) : '';
+
+      if (providers.google) {
+        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/google/callback' + orgQuery + '">Continue with Google</a>');
+      }
+      if (providers.apple) {
+        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/apple/callback' + orgQuery + '">Continue with Apple</a>');
+      }
+      if (providers.microsoft) {
+        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/microsoft/callback' + orgQuery + '">Continue with Microsoft</a>');
+      }
+
+      var sso = buttons.length > 0
+        ? '<div class="sso-section">'
+          + '<p class="sso-title">Sign in with SSO</p>'
+          + '<div class="sso-buttons">' + buttons.join('') + '</div>'
+          + '</div>'
+        : '';
+
       return '<div class="card center-card">'
         + '<div class="icon">&#128197;</div>'
         + '<h1 style="font-size:1.8rem">TimePilot</h1>'
         + '<p>To book an appointment, use a scheduling link shared by your host.</p>'
+        + sso
         + '</div>';
     }
 
