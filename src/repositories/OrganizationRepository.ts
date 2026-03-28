@@ -60,6 +60,19 @@ export class OrganizationRepository extends BaseRepository<Organization> {
   }
 
   /**
+   * Find organization by ID scoped to the tenant.
+   * Overrides base: organizations have no organization_id column — the id IS the tenant root.
+   */
+  async findById(id: UUID, tenant: TenantContext): Promise<Organization | null> {
+    if (id !== tenant.organizationId) return null;
+    const result = await db(
+      `SELECT ${this.columns.join(', ')} FROM organizations WHERE id = $1`,
+      [id],
+    );
+    return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  /**
    * Find organization by ID without tenant context.
    * Safe for auth/session org-resolution flows where membership is validated separately.
    */
@@ -70,6 +83,16 @@ export class OrganizationRepository extends BaseRepository<Organization> {
     );
 
     return result.rows[0] ? this.mapRow(result.rows[0]) : null;
+  }
+
+  /**
+   * Overrides base: organizations table has no organization_id column.
+   * Ownership is verified by confirming the requested id equals the tenant's own org id.
+   */
+  protected async verifyTenantOwnership(id: UUID, tenant: TenantContext): Promise<void> {
+    if (id !== tenant.organizationId) {
+      throw new Error('Record not found or does not belong to tenant');
+    }
   }
 
   /**
@@ -89,6 +112,14 @@ export class OrganizationRepository extends BaseRepository<Organization> {
     if (data.name) {
       updates.push(`name = $${paramIndex++}`);
       values.push(data.name);
+    }
+    if (data.description !== undefined) {
+      updates.push(`description = $${paramIndex++}`);
+      values.push(data.description || null);
+    }
+    if (data.logoUrl !== undefined) {
+      updates.push(`logo_url = $${paramIndex++}`);
+      values.push(data.logoUrl || null);
     }
     if (data.primaryColor) {
       updates.push(`primary_color = $${paramIndex++}`);
