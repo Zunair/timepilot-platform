@@ -7,7 +7,7 @@
 # Phase 1 (MVP) - TODO
 ## Phase Status
 - State: IN-PROGRESS
-- Last Updated: 2026-03-27
+- Last Updated: 2026-03-28
 - Owner: Tech Lead
 - Active Blockers: None
 - Approval: Tech Lead
@@ -159,6 +159,13 @@
 ## Documentation
 - [x] COMPLETED Architecture documentation (docs/ARCHITECTURE.md)
 - [x] COMPLETED Implementation status documentation (docs/IMPLEMENTATION_STATUS.md)
+- [ ] IN-PROGRESS Add Ubuntu admin setup and service operations runbook
+  - [x] COMPLETED Add first-install automation script for Ubuntu (scripts/ops/install-ubuntu.sh)
+  - [x] COMPLETED Add templated systemd unit for multi-instance services (scripts/ops/timepilot@.service.template)
+  - [x] COMPLETED Add installer diagnostics logging and failure triage output (scripts/ops/install-ubuntu.sh)
+  - [x] COMPLETED Document dev/prod service operations and env separation policy (docs/ADMIN_SETUP_UBUNTU.md)
+  - [x] COMPLETED Add deployment bootstrap README with GitHub SSH key and clone instructions (docs/DEPLOYMENT.md)
+  - [ ] NOT-STARTED Validate installer end-to-end on clean Ubuntu host and capture logs
 - [ ] NOT-STARTED Create API documentation
 - [ ] NOT-STARTED Document booking flow for clients
 - [ ] NOT-STARTED Create admin setup guide
