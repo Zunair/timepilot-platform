@@ -166,6 +166,16 @@ describe('BOOKING_HTML JavaScript SPA', () => {
     expect(BOOKING_HTML).toContain('function copyRef(');
     expect(BOOKING_HTML).toContain('navigator.clipboard');
   });
+
+  it('keeps booking-link generate handler separate from settings-back handler', () => {
+    var clickSection = BOOKING_HTML.split("document.addEventListener('click', function(e) {")[1] || '';
+    var settingsBackIndex = clickSection.indexOf("if (e.target && e.target.id === 'settings-back') {");
+    var generateIndex = clickSection.indexOf("if (e.target && e.target.id === 'generate-booking-link') {");
+
+    expect(generateIndex).toBeGreaterThan(-1);
+    expect(settingsBackIndex).toBeGreaterThan(-1);
+    expect(generateIndex).toBeLessThan(settingsBackIndex);
+  });
 });
 
 describe('BOOKING_HTML API integration', () => {

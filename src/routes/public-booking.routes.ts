@@ -73,6 +73,8 @@ publicBookingRouter.get('/:token/qr', async (req: Request, res: Response) => {
   const bookingUrl = `${env.CLIENT_BASE_URL}/?bk=${token}`;
   const svg = await QRCode.toString(bookingUrl, { type: 'svg', margin: 1 });
 
+  // Admin UI runs on a different origin (port 3001), so allow embedding this image.
+  res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, max-age=3600');
   res.send(svg);

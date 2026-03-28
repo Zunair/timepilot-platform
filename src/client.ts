@@ -1387,68 +1387,71 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         copyRef(e.target); return;
       }
 
+      // Booking links — generate
+      if (e.target && e.target.id === 'generate-booking-link') {
+        if (S.linkGenerating || !S.settingsOrg) return;
+        S.linkGenerating = true;
+        S.linkGenerateError = null;
+        render();
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links', {
+          method: 'POST',
+          body: { userId: S.userId, label: S.settingsOrg.name + ' booking' },
+        }).then(function(newLink) {
+          S.bookingLinks = [newLink].concat(S.bookingLinks || []);
+          S.linkGenerating = false;
+          render();
+        }).catch(function(err) {
+          S.linkGenerating = false;
+          S.linkGenerateError = (err && err.message) || 'Failed to generate link';
+          render();
+        });
+        return;
+      }
+
+      // Booking links — copy URL to clipboard
+      var copyBtn = e.target && e.target.closest('[data-copy-link]');
+      if (copyBtn) {
+        var copyUrl = copyBtn.getAttribute('data-copy-link');
+        if (copyUrl && navigator.clipboard) {
+          navigator.clipboard.writeText(copyUrl).then(function() {
+            copyBtn.textContent = 'Copied!';
+            setTimeout(function() { copyBtn.textContent = 'Copy'; }, 2000);
+          });
+        }
+        return;
+      }
+
+      // Booking links — toggle QR code visibility
+      var qrBtn = e.target && e.target.closest('[data-toggle-qr]');
+      if (qrBtn) {
+        var qrToken = qrBtn.getAttribute('data-toggle-qr');
+        var qrEl = document.getElementById('qr-' + qrToken);
+        if (qrEl) {
+          qrEl.style.display = qrEl.style.display === 'none' ? 'block' : 'none';
+          qrBtn.textContent = qrEl.style.display === 'none' ? 'QR' : 'Hide QR';
+        }
+        return;
+      }
+
+      // Booking links — delete
+      var deleteBtn = e.target && e.target.closest('[data-delete-link-id]');
+      if (deleteBtn) {
+        var deleteLinkId = deleteBtn.getAttribute('data-delete-link-id');
+        if (!S.settingsOrg || !deleteLinkId) return;
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links/' + deleteLinkId, {
+          method: 'DELETE',
+        }).then(function() {
+          S.bookingLinks = (S.bookingLinks || []).filter(function(lnk) { return lnk.id !== deleteLinkId; });
+          render();
+        }).catch(function(err) {
+          S.linkGenerateError = (err && err.message) || 'Failed to delete link';
+          render();
+        });
+        return;
+      }
+
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
-
-              // Booking links — generate
-              if (e.target && e.target.id === 'generate-booking-link') {
-                if (S.linkGenerating || !S.settingsOrg) return;
-                S.linkGenerating = true; S.linkGenerateError = null; render();
-                apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links', {
-                  method: 'POST',
-                  body: { userId: S.userId, label: S.settingsOrg.name + ' booking' },
-                }).then(function(newLink) {
-                  S.bookingLinks = [newLink].concat(S.bookingLinks || []);
-                  S.linkGenerating = false; render();
-                }).catch(function(err) {
-                  S.linkGenerating = false;
-                  S.linkGenerateError = (err && err.message) || 'Failed to generate link';
-                  render();
-                });
-                return;
-              }
-
-              // Booking links — copy URL to clipboard
-              var copyBtn = e.target && e.target.closest('[data-copy-link]');
-              if (copyBtn) {
-                var copyUrl = copyBtn.getAttribute('data-copy-link');
-                if (copyUrl && navigator.clipboard) {
-                  navigator.clipboard.writeText(copyUrl).then(function() {
-                    copyBtn.textContent = 'Copied!';
-                    setTimeout(function() { copyBtn.textContent = 'Copy'; }, 2000);
-                  });
-                }
-                return;
-              }
-
-              // Booking links — toggle QR code visibility
-              var qrBtn = e.target && e.target.closest('[data-toggle-qr]');
-              if (qrBtn) {
-                var qrToken = qrBtn.getAttribute('data-toggle-qr');
-                var qrEl = document.getElementById('qr-' + qrToken);
-                if (qrEl) {
-                  qrEl.style.display = qrEl.style.display === 'none' ? 'block' : 'none';
-                  qrBtn.textContent = qrEl.style.display === 'none' ? 'QR' : 'Hide QR';
-                }
-                return;
-              }
-
-              // Booking links — delete
-              var deleteBtn = e.target && e.target.closest('[data-delete-link-id]');
-              if (deleteBtn) {
-                var deleteLinkId = deleteBtn.getAttribute('data-delete-link-id');
-                if (!S.settingsOrg || !deleteLinkId) return;
-                apiFetch('/api/organizations/' + S.settingsOrg.id + '/booking-links/' + deleteLinkId, {
-                  method: 'DELETE',
-                }).then(function() {
-                  S.bookingLinks = (S.bookingLinks || []).filter(function(lnk) { return lnk.id !== deleteLinkId; });
-                  render();
-                }).catch(function(err) {
-                  S.linkGenerateError = (err && err.message) || 'Failed to delete link';
-                  render();
-                });
-                return;
-              }
         S.step = 'admin';
         render();
         return;
@@ -1466,28 +1469,8 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         S.profileError = null;
         S.profileMessage = null;
         S.step = 'admin-settings';
-        render();
-        Promise.all([
-          apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
-          apiFetch('/api/users/me'),
-        ]).then(function(results) {
-          S.settingsOrg = results[0].organization || S.settingsOrg;
-          S.userProfile = results[1];
-          render();
-        }).catch(function() { render(); });
-                S.bookingLinksLoading = true;
-                Promise.all([
-                  apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
-                  apiFetch('/api/users/me'),
-                  apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
-                ]).then(function(results) {
-                  S.settingsOrg = results[0].organization || S.settingsOrg;
-                  S.userProfile = results[1];
-                  S.bookingLinks = results[2] || [];
-                  S.bookingLinksLoading = false;
-                  render();
-                }).catch(function() { S.bookingLinksLoading = false; render(); });
         S.bookingLinksLoading = true;
+        render();
         Promise.all([
           apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
           apiFetch('/api/users/me'),
