@@ -85,6 +85,7 @@ sudo bash scripts/ops/install-ubuntu.sh \
 ```
 
 Use `--git-user` when your GitHub SSH key is on your login account (for example `ubuntu`) and not on the service account (`app`).
+Use the Linux account name, not your GitHub username or email.
 
 This will:
 - install dependencies

@@ -47,7 +47,7 @@ Options:
   --log-dir <path>          Installer log directory (default: /var/log/timepilot)
   --app-user <user>         Linux user to run service (default: app)
   --app-group <group>       Linux group to run service (default: app)
-  --git-user <user>         Linux user to run git clone/fetch (default: app-user)
+  --git-user <user>         Linux account to run git clone/fetch (e.g. ubuntu, not email)
   --skip-start              Install/update only; do not start/restart services
   --force-env               Recreate env skeleton files if they already exist
   --help                    Show this help
@@ -144,10 +144,6 @@ parse_args() {
   [[ -n "$REPO_URL" ]] || die "--repo-url is required"
   validate_port "$DEV_PORT"
   validate_port "$PROD_PORT"
-
-  if [[ -z "$GIT_USER" ]]; then
-    GIT_USER="$APP_USER"
-  fi
 
   ENV_DIR="$BASE_DIR/environments"
 }
@@ -261,13 +257,35 @@ repo_uses_ssh() {
   [[ "$REPO_URL" =~ ^git@ ]] || [[ "$REPO_URL" =~ ^ssh:// ]]
 }
 
+run_git_as_user() {
+  local candidate_user="$1"
+  shift
+
+  if [[ -n "${SSH_AUTH_SOCK:-}" ]]; then
+    sudo -u "$candidate_user" env "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" "SSH_AGENT_PID=${SSH_AGENT_PID:-}" git "$@"
+  else
+    sudo -u "$candidate_user" git "$@"
+  fi
+}
+
 can_user_access_repo() {
   local candidate_user="$1"
-  sudo -u "$candidate_user" env GIT_TERMINAL_PROMPT=0 git ls-remote --heads "$REPO_URL" >/dev/null 2>&1
+  run_git_as_user "$candidate_user" -c core.askPass=true ls-remote --heads "$REPO_URL" >/dev/null 2>&1
 }
 
 resolve_git_user() {
-  id -u "$GIT_USER" >/dev/null 2>&1 || die "git user '$GIT_USER' does not exist"
+  if [[ -n "$GIT_USER" ]] && ! id -u "$GIT_USER" >/dev/null 2>&1; then
+    log "Configured git user '$GIT_USER' does not exist; falling back to auto-detection"
+    GIT_USER=""
+  fi
+
+  if [[ -z "$GIT_USER" ]]; then
+    if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" ]] && id -u "$SUDO_USER" >/dev/null 2>&1; then
+      GIT_USER="$SUDO_USER"
+    else
+      GIT_USER="$APP_USER"
+    fi
+  fi
 
   if ! repo_uses_ssh; then
     log "Git URL is non-SSH; using git user: $GIT_USER"
@@ -304,12 +322,12 @@ clone_or_update_repo() {
 
   if [[ -d "$app_dir/.git" ]]; then
     log "Updating repository in $app_dir (branch: $branch)"
-    sudo -u "$GIT_USER" git -C "$app_dir" fetch --all --prune
-    sudo -u "$GIT_USER" git -C "$app_dir" checkout "$branch"
-    sudo -u "$GIT_USER" git -C "$app_dir" pull --ff-only origin "$branch"
+    run_git_as_user "$GIT_USER" -C "$app_dir" fetch --all --prune
+    run_git_as_user "$GIT_USER" -C "$app_dir" checkout "$branch"
+    run_git_as_user "$GIT_USER" -C "$app_dir" pull --ff-only origin "$branch"
   else
     log "Cloning repository into $app_dir (branch: $branch)"
-    sudo -u "$GIT_USER" git clone --branch "$branch" --single-branch "$REPO_URL" "$app_dir"
+    run_git_as_user "$GIT_USER" clone --branch "$branch" --single-branch "$REPO_URL" "$app_dir"
   fi
 
   chown -R "$APP_USER:$APP_GROUP" "$app_dir"
