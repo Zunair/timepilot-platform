@@ -56,6 +56,8 @@ describe('BOOKING_HTML JavaScript SPA', () => {
   });
 
   it('includes all screen templates', () => {
+    expect(BOOKING_HTML).toContain('function tmplAdmin(');
+    expect(BOOKING_HTML).toContain('function tmplAdminEmpty(');
     expect(BOOKING_HTML).toContain('function tmplCalendar(');
     expect(BOOKING_HTML).toContain('function tmplNoAvailability(');
     expect(BOOKING_HTML).toContain('function tmplSlots(');
@@ -68,18 +70,38 @@ describe('BOOKING_HTML JavaScript SPA', () => {
   it('shows SSO buttons only from configured provider flags', () => {
     expect(BOOKING_HTML).toContain('window.__TP.oauthProviders');
     expect(BOOKING_HTML).toContain('Continue with Google');
-    expect(BOOKING_HTML).toContain('google-sso-btn');
-    expect(BOOKING_HTML).toContain('Gmail send permission');
     expect(BOOKING_HTML).toContain('Continue with Apple');
     expect(BOOKING_HTML).toContain('Continue with Microsoft');
     expect(BOOKING_HTML).toContain("new URLSearchParams(location.search).get('org')");
-    expect(BOOKING_HTML).toContain('/api/auth/google/callback' + "' + orgQuery");
+    expect(BOOKING_HTML).toContain("buildAuthHref('/api/auth/google/callback')");
   });
 
-  it('prompts for Google mailbox permission confirmation before OAuth redirect', () => {
-    expect(BOOKING_HTML).toContain("window.confirm('TimePilot will request Gmail send permission");
-    expect(BOOKING_HTML).toContain("if (!proceed)");
-    expect(BOOKING_HTML).toContain('e.preventDefault()');
+  it('uses post-login org/session resolution when org and user query params are absent', () => {
+    expect(BOOKING_HTML).toContain('loadSessionContext(selectOrg)');
+    expect(BOOKING_HTML).toContain("apiFetch('/api/auth/session')");
+    expect(BOOKING_HTML).toContain("apiFetch('/api/auth/organizations')");
+    expect(BOOKING_HTML).toContain("S.step = 'admin'");
+    expect(BOOKING_HTML).toContain("apiFetch('/api/auth/organizations/select'");
+  });
+
+  it('shows admin onboarding choices for users without an organization', () => {
+    expect(BOOKING_HTML).toContain('No organization assigned yet');
+    expect(BOOKING_HTML).toContain('intent-appointment');
+    expect(BOOKING_HTML).toContain('intent-create-org');
+    expect(BOOKING_HTML).toContain("Please request a booking link from the vendor.");
+    expect(BOOKING_HTML).toContain("apiFetch('/api/auth/organizations/create'");
+  });
+
+  it('shows a simple admin workspace view with user id and organizations', () => {
+    expect(BOOKING_HTML).toContain('Your workspace');
+    expect(BOOKING_HTML).toContain('User ID: <strong>');
+    expect(BOOKING_HTML).toContain('Open booking link');
+  });
+
+  it('shows a deferred email-scope enable banner after login when Gmail scope is missing', () => {
+    expect(BOOKING_HTML).toContain('function tmplEmailBanner(');
+    expect(BOOKING_HTML).toContain('Email notifications are disabled because Gmail access is not enabled.');
+    expect(BOOKING_HTML).toContain('/api/auth/google/enable-email-scope?returnTo=');
   });
 
   it('has XSS-prevention esc() helper', () => {
