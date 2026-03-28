@@ -66,7 +66,8 @@
   - [x] COMPLETED Generate booking reference/confirmation number (TP-YYYYMMDD-XXXXXXXX via src/utils/confirmation.ts)
 
 ## Settings & Configuration
-- [ ] NOT-STARTED Build admin settings panel
+- [ ] IN-PROGRESS Build admin settings panel
+  - [x] COMPLETED Create lightweight admin landing page (simple org list + user id + onboarding choices in src/client.ts)
   - [ ] NOT-STARTED Create schedule rule configuration
   - [ ] NOT-STARTED Implement timezone selection and storage
   - [ ] NOT-STARTED Build branding/theme customization
@@ -98,9 +99,16 @@
   - [ ] NOT-STARTED Add dead-letter queue for failed notifications (max 5 attempts, then abandoned)
 
 - [ ] IN-PROGRESS Add provider mailbox sending (Google first)
-  - [x] COMPLETED Request Gmail send scope during Google OAuth with explicit user-facing purpose notice
+  - [x] COMPLETED Defer Gmail send scope until post-login banner opt-in flow
   - [x] COMPLETED Add Google mailbox send path in notification worker with SMTP fallback
   - [ ] NOT-STARTED Add end-to-end worker tests for Google mailbox delivery and fallback behavior
+
+## Post-Login Onboarding
+- [ ] IN-PROGRESS Add admin landing and zero-org onboarding flow
+  - [x] COMPLETED Route identity-first logins to admin landing instead of booking page
+  - [x] COMPLETED Show org list and user id for logged-in users on /admin
+  - [x] COMPLETED Let users without orgs choose create-organization vs appointment intent
+  - [x] COMPLETED Create organization with backend-generated slug and default 14-day weekday availability
 
 ## Backend Persistence
 - [x] COMPLETED Set up database schema (src/db/migrate.ts)
