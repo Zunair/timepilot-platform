@@ -82,3 +82,47 @@ export function localDateToUTCSearchRange(localDate: string): { from: string; to
     to:   new Date(dayEnd.getTime()   + PAD).toISOString(),
   };
 }
+
+/**
+ * Convert a local date/time in an IANA timezone to a UTC ISO timestamp.
+ * Uses an iterative correction approach against Intl timezone formatting.
+ */
+export function localDateTimeInTimezoneToUTC(
+  localDate: string,
+  localTime: string,
+  timezone: string,
+): string {
+  const [year, month, day] = localDate.split('-').map(Number);
+  const [hour, minute] = localTime.split(':').map(Number);
+  const desiredUtcParts = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+
+  let candidateUtcMs = desiredUtcParts;
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+
+  for (let i = 0; i < 3; i += 1) {
+    const parts = formatter.formatToParts(new Date(candidateUtcMs));
+    const lookup = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    const actualUtcParts = Date.UTC(
+      Number(lookup.year),
+      Number(lookup.month) - 1,
+      Number(lookup.day),
+      Number(lookup.hour),
+      Number(lookup.minute),
+      0,
+      0,
+    );
+    const delta = desiredUtcParts - actualUtcParts;
+    if (delta === 0) break;
+    candidateUtcMs += delta;
+  }
+
+  return new Date(candidateUtcMs).toISOString();
+}
