@@ -22,6 +22,7 @@ describe('BOOKING_HTML structure', () => {
   it('injects server-side config into window.__TP', () => {
     expect(BOOKING_HTML).toContain('window.__TP =');
     expect(BOOKING_HTML).toContain('"api"');
+    expect(BOOKING_HTML).toContain('"oauthProviders"');
   });
 
   it('includes a valid HTML5 doctype and lang attribute', () => {
@@ -59,6 +60,15 @@ describe('BOOKING_HTML JavaScript SPA', () => {
     expect(BOOKING_HTML).toContain('function tmplConfirmed(');
     expect(BOOKING_HTML).toContain('function tmplWelcome(');
     expect(BOOKING_HTML).toContain('function tmplError(');
+  });
+
+  it('shows SSO buttons only from configured provider flags', () => {
+    expect(BOOKING_HTML).toContain('window.__TP.oauthProviders');
+    expect(BOOKING_HTML).toContain('Continue with Google');
+    expect(BOOKING_HTML).toContain('Continue with Apple');
+    expect(BOOKING_HTML).toContain('Continue with Microsoft');
+    expect(BOOKING_HTML).toContain("new URLSearchParams(location.search).get('org')");
+    expect(BOOKING_HTML).toContain('/api/auth/google/callback' + "' + orgQuery");
   });
 
   it('has XSS-prevention esc() helper', () => {
