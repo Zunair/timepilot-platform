@@ -179,7 +179,9 @@ async function processOne(notification: Notification): Promise<void> {
       });
 
       if (!sentViaGoogle) {
-        if (!transporter) throw new Error('No Google mailbox permission and SMTP not configured');
+        if (!transporter) {
+          throw new Error('Email notifications disabled: Gmail scope not granted and SMTP not configured');
+        }
         await transporter.sendMail({
           from: env.SMTP_FROM ?? 'noreply@timepilot.app',
           to:   notification.recipient,
