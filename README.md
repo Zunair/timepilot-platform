@@ -69,6 +69,9 @@ See [Architecture Documentation](docs/ARCHITECTURE.md) and [Implementation Statu
 
 ## Getting Started
 
+For Ubuntu service deployment guidance (dev/prod instances with one systemd template), see [docs/ADMIN_SETUP_UBUNTU.md](docs/ADMIN_SETUP_UBUNTU.md).
+For full deployment bootstrap (including SSH key setup and SSH clone workflow), see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
 ### Prerequisites
 
 Before running the app locally, ensure you have installed:
