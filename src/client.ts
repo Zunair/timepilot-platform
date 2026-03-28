@@ -5,6 +5,7 @@
  * The app is a self-contained HTML/CSS/JS document — no bundler, no framework deps.
  *
  * URL patterns handled by the browser SPA:
+ *   /                                              — login and org resolution entry
  *   /?org=<slug>&user=<userId>[&duration=<mins>]  — booking wizard
  *   /?ref=<confirmationRef>                        — view a confirmed booking
  */
@@ -360,11 +361,53 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       font-size: 0.92rem;
     }
     .sso-btn:hover { border-color: var(--accent); background: var(--accent-lite); }
-    .sso-note {
-      margin: 8px 0 0;
+    .email-banner {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      border: 1px solid #f5d0a7;
+      background: #fff7ed;
+      color: #9a3412;
+      border-radius: 10px;
+      padding: 10px 12px;
+      margin-bottom: 16px;
+      font-size: 0.88rem;
+    }
+    .email-banner a {
+      color: #9a3412;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+    .org-select-list {
+      display: grid;
+      gap: 10px;
+      margin-top: 16px;
+    }
+    .org-select-btn {
+      width: 100%;
+      text-align: left;
+      border: 1px solid var(--border);
+      background: #fff;
+      color: var(--text);
+      border-radius: 10px;
+      padding: 12px 14px;
+      cursor: pointer;
+      transition: border-color 0.12s, background 0.12s;
+    }
+    .org-select-btn:hover {
+      border-color: var(--accent);
+      background: var(--accent-lite);
+    }
+    .org-select-name {
+      font-size: 0.98rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 4px;
+    }
+    .org-select-meta {
       font-size: 0.82rem;
       color: var(--muted);
-      line-height: 1.4;
     }
   </style>
 </head>
@@ -384,6 +427,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       step:      'init',
       org:       null,     // { id, name, slug, description, logoUrl }
       userId:    null,     // UUID of the bookable user
+      organizations: [],
+      emailNotifications: { googleLinked: false, enabled: true },
+      adminMessage: null,
+      creatingOrganization: false,
+      intentChoice: null,
       duration:  60,       // Slot duration in minutes
       tz:        Intl.DateTimeFormat().resolvedOptions().timeZone,
       month:     null,     // Date set to 1st of displayed month
@@ -397,6 +445,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       availabilityLoading: false,
       availabilityMonthKey: null,
       hasAnyAvailability: null,
+      selectingOrganization: false,
     };
 
     // ─── API helper ─────────────────────────────────────────────────
@@ -416,6 +465,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     // ─── Boot ────────────────────────────────────────────────────────
     function boot() {
       var p    = new URLSearchParams(location.search);
+      var path = location.pathname;
       var d    = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0);
       S.month  = d;
 
@@ -423,13 +473,89 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var org  = p.get('org');
       var user = p.get('user');
       var dur  = parseInt(p.get('duration') || '60', 10);
+      var selectOrg = p.get('selectOrg') === '1';
 
       if (ref)  { loadByRef(ref); return; }
-      if (!org || !user) { S.step = 'welcome'; render(); return; }
+
+      S.duration = (isNaN(dur) || dur < 15) ? 60 : dur;
+
+      if (path === '/admin') {
+        loadSessionContext(true);
+        return;
+      }
+
+      if (!org || !user) {
+        loadSessionContext(selectOrg);
+        return;
+      }
 
       S.userId   = user;
-      S.duration = (isNaN(dur) || dur < 15) ? 60 : dur;
       loadOrg(org);
+    }
+
+    function loadSessionContext(forceOrgSelection) {
+      S.step = 'loading'; render();
+
+      apiFetch('/api/auth/session')
+        .then(function(session) {
+          if (!session || !session.userId) {
+            S.step = 'welcome';
+            render();
+            return;
+          }
+
+          S.userId = session.userId;
+          loadOrganizationContext(forceOrgSelection);
+        })
+        .catch(function() {
+          S.step = 'welcome';
+          render();
+        });
+    }
+
+    function redirectToBookingSlug(slug) {
+      var next = '/?org=' + encodeURIComponent(slug)
+        + '&user=' + encodeURIComponent(S.userId)
+        + '&duration=' + encodeURIComponent(S.duration);
+      location.replace(next);
+    }
+
+    function redirectToAdmin() {
+      location.replace('/admin');
+    }
+
+    function loadOrganizationContext(forceOrgSelection) {
+      apiFetch('/api/auth/organizations')
+        .then(function(ctx) {
+          var orgs = (ctx && ctx.organizations) || [];
+          S.organizations = orgs;
+          S.emailNotifications = (ctx && ctx.emailNotifications)
+            ? ctx.emailNotifications
+            : { googleLinked: false, enabled: true };
+
+          if (orgs.length === 0) {
+            S.step = 'admin-empty';
+            render();
+            return;
+          }
+
+          if (orgs.length === 1 && !forceOrgSelection && location.pathname !== '/admin') {
+            redirectToAdmin();
+            return;
+          }
+
+          if (orgs.length > 1 || forceOrgSelection || location.pathname === '/admin') {
+            S.step = 'admin';
+            render();
+            return;
+          }
+
+          redirectToAdmin();
+        })
+        .catch(function() {
+          S.step = 'welcome';
+          render();
+        });
     }
 
     // ─── Data loaders ────────────────────────────────────────────────
@@ -689,6 +815,9 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       switch (S.step) {
         case 'loading':      app.innerHTML = tmplLoading();   break;
         case 'welcome':      app.innerHTML = tmplWelcome();   break;
+        case 'admin':        app.innerHTML = tmplAdmin();     break;
+        case 'admin-empty':  app.innerHTML = tmplAdminEmpty(); break;
+        case 'org-select':   app.innerHTML = tmplOrgSelection(); break;
         case 'no-availability': app.innerHTML = tmplNoAvailability(); break;
         case 'error':        app.innerHTML = tmplError();     break;
         case 'calendar':
@@ -710,25 +839,29 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var providers = (window.__TP && window.__TP.oauthProviders) || {};
       var buttons = [];
       var orgSlug = new URLSearchParams(location.search).get('org');
-      var orgQuery = orgSlug ? ('?org=' + encodeURIComponent(orgSlug)) : '';
+      var returnTo = encodeURIComponent(orgSlug ? location.href : (location.origin + '/admin'));
+
+      function buildAuthHref(providerPath) {
+        var params = [];
+        if (orgSlug) params.push('org=' + encodeURIComponent(orgSlug));
+        params.push('returnTo=' + returnTo);
+        return window.__TP.api + providerPath + '?' + params.join('&');
+      }
 
       if (providers.google) {
-        buttons.push('<a class="sso-btn" id="google-sso-btn" href="' + window.__TP.api + '/api/auth/google/callback' + orgQuery + '">Continue with Google</a>');
+        buttons.push('<a class="sso-btn" href="' + buildAuthHref('/api/auth/google/callback') + '">Continue with Google</a>');
       }
       if (providers.apple) {
-        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/apple/callback' + orgQuery + '">Continue with Apple</a>');
+        buttons.push('<a class="sso-btn" href="' + buildAuthHref('/api/auth/apple/callback') + '">Continue with Apple</a>');
       }
       if (providers.microsoft) {
-        buttons.push('<a class="sso-btn" href="' + window.__TP.api + '/api/auth/microsoft/callback' + orgQuery + '">Continue with Microsoft</a>');
+        buttons.push('<a class="sso-btn" href="' + buildAuthHref('/api/auth/microsoft/callback') + '">Continue with Microsoft</a>');
       }
 
       var sso = buttons.length > 0
         ? '<div class="sso-section">'
           + '<p class="sso-title">Sign in with SSO</p>'
           + '<div class="sso-buttons">' + buttons.join('') + '</div>'
-          + (providers.google
-              ? '<p class="sso-note">Google sign-in requests Gmail send permission so TimePilot can send reminders from your own mailbox to your clients.</p>'
-              : '')
           + '</div>'
         : '';
 
@@ -737,6 +870,99 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<h1 style="font-size:1.8rem">TimePilot</h1>'
         + '<p>To book an appointment, use a scheduling link shared by your host.</p>'
         + sso
+        + '</div>';
+    }
+
+    function tmplEmailBanner() {
+      if (!S.emailNotifications || !S.emailNotifications.googleLinked || S.emailNotifications.enabled) {
+        return '';
+      }
+
+      var enableUrl = window.__TP.api
+        + '/api/auth/google/enable-email-scope?returnTo='
+        + encodeURIComponent(location.href);
+
+      return '<div class="email-banner">'
+        + '<span>Email notifications are disabled because Gmail access is not enabled.</span>'
+        + '<a href="' + enableUrl + '">Enable now</a>'
+        + '</div>';
+    }
+
+    function tmplAdminOrgList(showBookingLinks) {
+      return (S.organizations || []).map(function(org) {
+        var bookingHref = '/?org=' + encodeURIComponent(org.slug)
+          + '&user=' + encodeURIComponent(S.userId)
+          + '&duration=' + encodeURIComponent(S.duration);
+        return '<div class="org-select-btn">'
+          + '<div class="org-select-name">' + esc(org.name) + '</div>'
+          + '<div class="org-select-meta">Role: ' + esc(org.role) + ' • ' + esc(org.slug) + '</div>'
+          + '<div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap">'
+          + '<button class="btn btn-ghost" data-org-id="' + esc(org.id) + '" data-org-slug="' + esc(org.slug) + '">Open org</button>'
+          + (showBookingLinks
+              ? '<a class="btn btn-ghost" href="' + bookingHref + '">Open booking link</a>'
+              : '')
+          + '</div>'
+          + '</div>';
+      }).join('');
+    }
+
+    function tmplAdmin() {
+      return '<div class="card">'
+        + tmplEmailBanner()
+        + '<span class="chip">Admin</span>'
+        + '<h2>Your workspace</h2>'
+        + '<p>User ID: <strong>' + esc(S.userId) + '</strong></p>'
+        + '<p>Your organizations are listed below. Settings UI will come later.</p>'
+        + '<div class="org-select-list">' + tmplAdminOrgList(true) + '</div>'
+        + '</div>';
+    }
+
+    function tmplAdminEmpty() {
+      var helper = '';
+      if (S.intentChoice === 'appointment') {
+        helper = '<div class="alert-error" style="background:#eff6ff;border-color:#bfdbfe;color:#1d4ed8">Please request a booking link from the vendor.</div>';
+      }
+      if (S.intentChoice === 'create-org') {
+        helper = '<form id="create-org-form" style="margin-top:18px;text-align:left">'
+          + '<div class="form-group">'
+          + '<label for="org-name">Organization name</label>'
+          + '<input id="org-name" name="name" type="text" placeholder="Acme Studio" required />'
+          + '</div>'
+          + '<button class="btn" type="submit"' + (S.creatingOrganization ? ' disabled' : '') + '>'
+          + (S.creatingOrganization ? 'Creating...' : 'Create organization')
+          + '</button>'
+          + '</form>';
+      }
+
+      return '<div class="card center-card">'
+        + tmplEmailBanner()
+        + '<div class="icon">&#127968;</div>'
+        + '<h2>No organization assigned yet</h2>'
+        + '<p>Would you like to create an organization, or are you trying to make an appointment?</p>'
+        + '<div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin-top:18px">'
+        + '<button class="btn btn-ghost" id="intent-appointment">Make an appointment</button>'
+        + '<button class="btn" id="intent-create-org">Create an organization</button>'
+        + '</div>'
+        + (S.adminMessage ? '<p style="margin-top:16px;color:var(--accent)">' + esc(S.adminMessage) + '</p>' : '')
+        + helper
+        + '</div>';
+    }
+
+    function tmplOrgSelection() {
+      var orgs = S.organizations || [];
+      var options = orgs.map(function(org) {
+        return '<button class="org-select-btn" data-org-id="' + esc(org.id) + '" data-org-slug="' + esc(org.slug) + '">'
+          + '<div class="org-select-name">' + esc(org.name) + '</div>'
+          + '<div class="org-select-meta">Role: ' + esc(org.role) + ' • ' + esc(org.slug) + '</div>'
+          + '</button>';
+      }).join('');
+
+      return '<div class="card center-card">'
+        + tmplEmailBanner()
+        + '<div class="icon">&#127970;</div>'
+        + '<h2>Select your organization</h2>'
+        + '<p>Your account belongs to multiple organizations. Choose one to continue.</p>'
+        + '<div class="org-select-list">' + options + '</div>'
         + '</div>';
     }
 
@@ -814,6 +1040,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         ? ' style="opacity:0.35;pointer-events:none"' : '';
 
       return '<div class="card">'
+        + tmplEmailBanner()
         + tmplOrgHeader()
         + '<span class="chip">Pick a date</span>'
         + '<div class="cal-nav">'
@@ -861,6 +1088,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         : '';
 
       return '<div class="card">'
+        + tmplEmailBanner()
         + tmplOrgHeader()
         + '<button class="back-link" id="back-to-slots">&#8592; Pick a different time</button>'
         + '<span class="chip">Your details</span>'
@@ -921,6 +1149,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         : '/';
 
       return '<div class="card confirmed-body">'
+        + tmplEmailBanner()
         + '<div class="confirmed-icon">&#10003;</div>'
         + '<h1>You&rsquo;re confirmed!</h1>'
         + '<p>Your appointment with <strong>' + orgName + '</strong> has been scheduled.</p>'
@@ -936,12 +1165,39 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
     // ─── Event delegation (registered once at startup) ───────────────
     document.addEventListener('click', function(e) {
-      if (e.target && e.target.id === 'google-sso-btn') {
-        var proceed = window.confirm('TimePilot will request Gmail send permission to send client reminders from your Google mailbox. Continue?');
-        if (!proceed) {
-          e.preventDefault();
-          return;
-        }
+      if (e.target && e.target.id === 'intent-appointment') {
+        S.intentChoice = 'appointment';
+        S.adminMessage = null;
+        render();
+        return;
+      }
+
+      if (e.target && e.target.id === 'intent-create-org') {
+        S.intentChoice = 'create-org';
+        S.adminMessage = null;
+        render();
+        return;
+      }
+
+      var orgSelectBtn = e.target && e.target.closest('[data-org-id][data-org-slug]');
+      if (orgSelectBtn) {
+        if (S.selectingOrganization) return;
+        S.selectingOrganization = true;
+
+        var selectedOrgId = orgSelectBtn.getAttribute('data-org-id');
+        var selectedOrgSlug = orgSelectBtn.getAttribute('data-org-slug');
+        apiFetch('/api/auth/organizations/select', {
+          method: 'POST',
+          body: { organizationId: selectedOrgId },
+        }).then(function() {
+          location.replace('/admin?org=' + encodeURIComponent(selectedOrgSlug));
+        }).catch(function(err) {
+          S.selectingOrganization = false;
+          S.error = (err && err.message) || 'Failed to switch organization';
+          S.step = 'error';
+          render();
+        });
+        return;
       }
 
       var dayEl = e.target.closest('[data-day]');
@@ -975,6 +1231,33 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     });
 
     document.addEventListener('submit', function(e) {
+      if (e.target && e.target.id === 'create-org-form') {
+        e.preventDefault();
+        if (S.creatingOrganization) return;
+        var orgName = e.target.querySelector('[name="name"]').value.trim();
+        if (!orgName) return;
+
+        S.creatingOrganization = true;
+        S.adminMessage = null;
+        render();
+
+        apiFetch('/api/auth/organizations/create', {
+          method: 'POST',
+          body: {
+            name: orgName,
+            timezone: S.tz,
+          },
+        }).then(function(data) {
+          S.creatingOrganization = false;
+          location.replace('/admin?org=' + encodeURIComponent(data.organizationSlug));
+        }).catch(function(err) {
+          S.creatingOrganization = false;
+          S.adminMessage = (err && err.message) || 'Failed to create organization';
+          render();
+        });
+        return;
+      }
+
       if (!e.target || e.target.id !== 'booking-form') return;
       e.preventDefault();
       var form  = e.target;
@@ -1012,7 +1295,8 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 
   server.listen(clientPort, () => {
     console.log(`TimePilot booking UI started on ${env.CLIENT_BASE_URL}`);
-    console.log(`  Usage:   ${env.CLIENT_BASE_URL}/?org=<slug>&user=<userId>`);
+    console.log(`  Usage:   ${env.CLIENT_BASE_URL}/admin`);
+    console.log(`  Direct:  ${env.CLIENT_BASE_URL}/?org=<slug>&user=<userId>`);
     console.log(`  Confirm: ${env.CLIENT_BASE_URL}/?ref=<confirmationRef>`);
   });
 
