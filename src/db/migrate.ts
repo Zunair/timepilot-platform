@@ -38,6 +38,7 @@ export async function runMigrations(): Promise<void> {
     { name: '001_initial_schema', sql: migration001 },
     { name: '002_add_notifications', sql: migration002 },
     { name: '003_oauth_token_lifecycle', sql: migration003 },
+    { name: '004_nullable_session_org', sql: migration004 },
   ];
 
   for (const migration of migrations) {
@@ -256,4 +257,15 @@ const migration003 = `
 
   CREATE INDEX IF NOT EXISTS idx_oauth_accounts_expiry
     ON oauth_accounts (access_token_expires_at);
+`;
+
+/**
+ * Migration 004: Allow org-less sessions during onboarding.
+ *
+ * Sessions may now exist without an active organization so newly signed-in
+ * users can reach admin onboarding and create/select an organization.
+ */
+const migration004 = `
+  ALTER TABLE sessions
+    ALTER COLUMN organization_id DROP NOT NULL;
 `;
