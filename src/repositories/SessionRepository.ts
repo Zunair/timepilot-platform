@@ -6,14 +6,14 @@ export class SessionRepository {
 
   async create(data: {
     userId: UUID;
-    organizationId: UUID;
+    organizationId?: UUID;
     expiresAt: string;
   }): Promise<Session> {
     const result = await db(
       `INSERT INTO sessions (user_id, organization_id, expires_at, created_at)
        VALUES ($1, $2, $3, CURRENT_TIMESTAMP)
        RETURNING ${this.columns.join(', ')}`,
-      [data.userId, data.organizationId, data.expiresAt],
+      [data.userId, data.organizationId ?? null, data.expiresAt],
     );
     return this.mapRow(result.rows[0]);
   }
@@ -45,13 +45,30 @@ export class SessionRepository {
     return result.rowCount ?? 0;
   }
 
+  /**
+   * Returns the most recently used organization for a user across sessions.
+   * This enables "remember last org" behavior at next login.
+   */
+  async findLatestOrganizationForUser(userId: UUID): Promise<UUID | null> {
+    const result = await db(
+      `SELECT organization_id
+       FROM sessions
+       WHERE user_id = $1
+       ORDER BY created_at DESC
+       LIMIT 1`,
+      [userId],
+    );
+
+    return (result.rows[0]?.organization_id as UUID | undefined) ?? null;
+  }
+
   private mapRow(row: Record<string, unknown>): Session {
     const toIso = (v: unknown) =>
       v instanceof Date ? v.toISOString() : (v as string);
     return {
       id: row.id as UUID,
       userId: row.user_id as UUID,
-      organizationId: row.organization_id as UUID,
+      organizationId: row.organization_id as UUID | undefined,
       expiresAt: toIso(row.expires_at),
       createdAt: toIso(row.created_at),
     };
