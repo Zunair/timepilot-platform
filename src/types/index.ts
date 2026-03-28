@@ -52,6 +52,15 @@ export interface OAuthProvider {
   profileImageUrl?: string;
 }
 
+export interface OAuthTokenLifecycle {
+  provider: 'google' | 'apple' | 'microsoft';
+  accessToken?: string;
+  refreshToken?: string;
+  tokenType?: string;
+  scope?: string;
+  accessTokenExpiresAt?: string; // ISO 8601 UTC
+}
+
 // ============================================================================
 // ORGANIZATIONS & TENANTS
 // ============================================================================
