@@ -129,7 +129,12 @@ SESSION_SECRET=your_local_dev_secret_key_change_in_production
 # OAuth Providers (optional for local development)
 # GOOGLE_CLIENT_ID=your_google_client_id
 # GOOGLE_CLIENT_SECRET=your_google_client_secret
-# ... (other OAuth credentials)
+# APPLE_CLIENT_ID=your_apple_services_id
+# APPLE_CLIENT_SECRET=your_apple_client_secret_jwt
+# APPLE_CALLBACK_URL=http://localhost:3000/api/auth/apple/callback
+# MICROSOFT_CLIENT_ID=your_microsoft_client_id
+# MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret_value
+# MICROSOFT_CALLBACK_URL=http://localhost:3000/api/auth/microsoft/callback
 ```
 
 #### 4. Set Up PostgreSQL Database
@@ -183,6 +188,25 @@ If you see a PostgreSQL error about `gen_random_uuid()`, enable the extension on
 psql -U user -d timepilot -c "CREATE EXTENSION IF NOT EXISTS pgcrypto;"
 ```
 
+#### 6.5 Seed Demo Booking Data (Optional but Recommended)
+
+```powershell
+# Creates/updates a demo org (acme), demo user, membership, and weekday availability
+npm run seed:demo
+```
+
+After seeding, get the user UUID:
+
+```powershell
+psql -U user -d timepilot -c "SELECT id, email FROM users WHERE email='demo@acme.com';"
+```
+
+Use the booking URL:
+
+```text
+http://localhost:3001/?org=acme&user=<user-uuid>
+```
+
 #### 7. Start Development Servers
 
 ```powershell
@@ -231,6 +255,25 @@ curl http://localhost:3000/health
 # Expected response:
 # {"status":"ok","timestamp":"2026-03-26T12:00:00.000Z"}
 ```
+
+Check OAuth provider visibility for login UI:
+
+```powershell
+curl http://localhost:3000/api/auth/providers
+
+# Example response when only Google is configured:
+# {
+#   "providers": { "google": true, "apple": false, "microsoft": false },
+#   "enabledProviders": ["google"]
+# }
+```
+
+Only providers with all three values set (`*_CLIENT_ID`, `*_CLIENT_SECRET`, `*_CALLBACK_URL`) are enabled.
+If a provider is missing keys, the UI should hide that SSO option.
+
+Notes:
+- For Microsoft Entra ID, `MICROSOFT_CLIENT_SECRET` must be the secret value, not the secret ID.
+- For Apple Sign-In, `APPLE_CLIENT_SECRET` must be an Apple-generated client-secret JWT for your Services ID.
 
 You can also verify the server from PowerShell with:
 
@@ -428,6 +471,7 @@ npm run dev:client    # Start client placeholder server
 npm run build         # Build for production
 npm run start         # Start production server
 npm run migrate       # Run database migrations
+npm run seed:demo     # Seed demo org/user/availability data
 npm run test          # Run tests
 npm run lint          # Run linting
 npm run type-check    # Run TypeScript type checking
