@@ -3,9 +3,11 @@ import {
   buildAppleOAuthAuthorizeUrl,
   buildGoogleOAuthAuthorizeUrl,
   buildMicrosoftOAuthAuthorizeUrl,
+  hasFreshAccessToken,
   getOrganizationSlugFromOAuthRequest,
   getOAuthProviderAvailability,
   getEnabledOAuthProviders,
+  parseOAuthProvider,
   parseQueryString,
   parseRequestParam,
   parseAppleIdentityPayload,
@@ -181,5 +183,19 @@ describe('oauth callback request parsing', () => {
     expect(getOrganizationSlugFromOAuthRequest(req)).toBe('acme');
     expect(parseRequestParam(req, 'code')).toBe('apple-code');
     expect(parseRequestParam(req, 'user')).toBe('{"email":"person@example.com"}');
+  });
+
+  it('parses only supported OAuth provider path values', () => {
+    expect(parseOAuthProvider('google')).toBe('google');
+    expect(parseOAuthProvider('apple')).toBe('apple');
+    expect(parseOAuthProvider('microsoft')).toBe('microsoft');
+    expect(parseOAuthProvider('github')).toBeNull();
+  });
+
+  it('treats access token expiry as fresh only when outside safety skew window', () => {
+    expect(hasFreshAccessToken(new Date(Date.now() + 2 * 60 * 1000).toISOString())).toBe(true);
+    expect(hasFreshAccessToken(new Date(Date.now() + 10 * 1000).toISOString())).toBe(false);
+    expect(hasFreshAccessToken(undefined)).toBe(false);
+    expect(hasFreshAccessToken('not-a-date')).toBe(false);
   });
 });
