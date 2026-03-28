@@ -7,6 +7,7 @@ BASE_DIR="/home/app/timepilot"
 ENV_DIR=""
 APP_USER="app"
 APP_GROUP="app"
+GIT_USER=""
 REPO_URL=""
 BRANCH_DEV="main"
 BRANCH_PROD="main"
@@ -46,6 +47,7 @@ Options:
   --log-dir <path>          Installer log directory (default: /var/log/timepilot)
   --app-user <user>         Linux user to run service (default: app)
   --app-group <group>       Linux group to run service (default: app)
+  --git-user <user>         Linux user to run git clone/fetch (default: app-user)
   --skip-start              Install/update only; do not start/restart services
   --force-env               Recreate env skeleton files if they already exist
   --help                    Show this help
@@ -53,6 +55,7 @@ Options:
 Examples:
   sudo ./scripts/ops/install-ubuntu.sh --repo-url https://github.com/timepilot/platform.git
   sudo ./scripts/ops/install-ubuntu.sh --repo-url git@github.com:timepilot/platform.git --branch-dev develop --branch-prod main
+  sudo ./scripts/ops/install-ubuntu.sh --repo-url git@github.com:timepilot/platform.git --git-user ubuntu
 USAGE
 }
 
@@ -116,6 +119,10 @@ parse_args() {
         APP_GROUP="${2:-}"
         shift 2
         ;;
+      --git-user)
+        GIT_USER="${2:-}"
+        shift 2
+        ;;
       --skip-start)
         SKIP_START="true"
         shift
@@ -137,6 +144,11 @@ parse_args() {
   [[ -n "$REPO_URL" ]] || die "--repo-url is required"
   validate_port "$DEV_PORT"
   validate_port "$PROD_PORT"
+
+  if [[ -z "$GIT_USER" ]]; then
+    GIT_USER="$APP_USER"
+  fi
+
   ENV_DIR="$BASE_DIR/environments"
 }
 
@@ -245,6 +257,39 @@ ensure_user_group() {
   fi
 }
 
+repo_uses_ssh() {
+  [[ "$REPO_URL" =~ ^git@ ]] || [[ "$REPO_URL" =~ ^ssh:// ]]
+}
+
+can_user_access_repo() {
+  local candidate_user="$1"
+  sudo -u "$candidate_user" env GIT_TERMINAL_PROMPT=0 git ls-remote --heads "$REPO_URL" >/dev/null 2>&1
+}
+
+resolve_git_user() {
+  id -u "$GIT_USER" >/dev/null 2>&1 || die "git user '$GIT_USER' does not exist"
+
+  if ! repo_uses_ssh; then
+    log "Git URL is non-SSH; using git user: $GIT_USER"
+    return
+  fi
+
+  if can_user_access_repo "$GIT_USER"; then
+    log "Using git user '$GIT_USER' for SSH repository operations"
+    return
+  fi
+
+  if [[ -n "${SUDO_USER:-}" && "${SUDO_USER}" != "root" && "${SUDO_USER}" != "$GIT_USER" ]]; then
+    if id -u "$SUDO_USER" >/dev/null 2>&1 && can_user_access_repo "$SUDO_USER"; then
+      log "Git user '$GIT_USER' cannot access $REPO_URL over SSH; switching git operations to sudo caller '$SUDO_USER'"
+      GIT_USER="$SUDO_USER"
+      return
+    fi
+  fi
+
+  die "SSH access failed for git user '$GIT_USER'. Provide --git-user <ssh-capable-user>, or use an HTTPS repo URL with credentials."
+}
+
 clone_or_update_repo() {
   local instance="$1"
   local branch="$2"
@@ -252,15 +297,22 @@ clone_or_update_repo() {
 
   mkdir -p "$BASE_DIR"
 
+  if [[ "$GIT_USER" != "$APP_USER" ]]; then
+    mkdir -p "$app_dir"
+    chown -R "$GIT_USER:$APP_GROUP" "$app_dir"
+  fi
+
   if [[ -d "$app_dir/.git" ]]; then
     log "Updating repository in $app_dir (branch: $branch)"
-    sudo -u "$APP_USER" git -C "$app_dir" fetch --all --prune
-    sudo -u "$APP_USER" git -C "$app_dir" checkout "$branch"
-    sudo -u "$APP_USER" git -C "$app_dir" pull --ff-only origin "$branch"
+    sudo -u "$GIT_USER" git -C "$app_dir" fetch --all --prune
+    sudo -u "$GIT_USER" git -C "$app_dir" checkout "$branch"
+    sudo -u "$GIT_USER" git -C "$app_dir" pull --ff-only origin "$branch"
   else
     log "Cloning repository into $app_dir (branch: $branch)"
-    sudo -u "$APP_USER" git clone --branch "$branch" --single-branch "$REPO_URL" "$app_dir"
+    sudo -u "$GIT_USER" git clone --branch "$branch" --single-branch "$REPO_URL" "$app_dir"
   fi
+
+  chown -R "$APP_USER:$APP_GROUP" "$app_dir"
 
   log "Installing dependencies in $app_dir"
   if [[ -f "$app_dir/package-lock.json" ]]; then
@@ -452,7 +504,7 @@ main() {
 
   log "Starting TimePilot Ubuntu installer"
   log "Configuration: base_dir=$BASE_DIR env_dir=$ENV_DIR instances=$INSTANCES dev_port=$DEV_PORT prod_port=$PROD_PORT"
-  log "Configuration: repo_url=$REPO_URL branch_dev=$BRANCH_DEV branch_prod=$BRANCH_PROD app_user=$APP_USER app_group=$APP_GROUP"
+  log "Configuration: repo_url=$REPO_URL branch_dev=$BRANCH_DEV branch_prod=$BRANCH_PROD app_user=$APP_USER app_group=$APP_GROUP git_user=$GIT_USER"
 
   ensure_ubuntu
 
@@ -465,6 +517,7 @@ main() {
   apt_install
   ensure_node
   ensure_user_group
+  resolve_git_user
 
   mkdir -p "$BASE_DIR/dev" "$BASE_DIR/prod" "$ENV_DIR"
   chown -R "$APP_USER:$APP_GROUP" "$BASE_DIR"

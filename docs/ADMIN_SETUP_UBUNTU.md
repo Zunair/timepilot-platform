@@ -45,8 +45,10 @@ Custom log path example:
 
 ```bash
 sudo bash scripts/ops/install-ubuntu.sh \
-  --repo-url https://github.com/timepilot/platform.git \
+  --repo-url https://github.com/timepilot/platform.git
   --log-dir /var/log/timepilot/installer
+
+If you use an SSH repo URL and your key is on a non-service login user, pass `--git-user <linux-login-user>` so clone/fetch runs under that account.
 ```
 
 Optional branch control:
@@ -72,6 +74,8 @@ Edit both files and replace placeholder values before starting:
 
 - /home/app/timepilot/environments/dev.env
 - /home/app/timepilot/environments/prod.env
+
+These files are generated from each instance's .env.example template and then patched with instance-specific values (ports, callback URLs, APP_DIR, NODE_BIN).
 
 Required fields include:
 - DATABASE_URL

@@ -80,8 +80,11 @@ From either clone, run the installer with SSH repo URL:
 ```bash
 cd /home/app/timepilot/prod
 sudo bash scripts/ops/install-ubuntu.sh \
-  --repo-url git@github.com:Zunair/timepilot-platform.git
+  --repo-url git@github.com:Zunair/timepilot-platform.git \
+  --git-user <your-linux-login-user>
 ```
+
+Use `--git-user` when your GitHub SSH key is on your login account (for example `ubuntu`) and not on the service account (`app`).
 
 This will:
 - install dependencies
