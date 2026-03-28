@@ -3,11 +3,6 @@
  *
  * Handles session lifecycle: create (via dev-only bypass or post-OAuth callback),
  * inspect, and revoke.
- *
- * OAuth provider integration (Google, Apple, Microsoft) is scaffolded here.
- * Each callback stub is marked with INTEGRATE comments where the provider
- * SDK token exchange and user-info fetch need to be wired in once credentials
- * are available.
  */
 
 import { Router, Request, Response } from 'express';
@@ -17,6 +12,221 @@ import { organizationMemberRepository } from '../repositories/OrganizationMember
 import { organizationRepository } from '../repositories/OrganizationRepository.js';
 import { env } from '../config/env.js';
 import type { UUID } from '../types/index.js';
+
+type OAuthProviderName = 'google' | 'apple' | 'microsoft';
+
+type OAuthEnvShape = {
+  GOOGLE_CLIENT_ID?: string;
+  GOOGLE_CLIENT_SECRET?: string;
+  GOOGLE_CALLBACK_URL?: string;
+  APPLE_CLIENT_ID?: string;
+  APPLE_CLIENT_SECRET?: string;
+  APPLE_CALLBACK_URL?: string;
+  MICROSOFT_CLIENT_ID?: string;
+  MICROSOFT_CLIENT_SECRET?: string;
+  MICROSOFT_CALLBACK_URL?: string;
+};
+
+function hasValue(v?: string): v is string {
+  return Boolean(v && v.trim().length > 0);
+}
+
+interface GoogleTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  id_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface GoogleUserInfoResponse {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+}
+
+interface MicrosoftTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  scope?: string;
+  id_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface MicrosoftGraphMeResponse {
+  id?: string;
+  displayName?: string;
+  givenName?: string;
+  surname?: string;
+  mail?: string;
+  userPrincipalName?: string;
+}
+
+interface AppleTokenResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  refresh_token?: string;
+  id_token?: string;
+  error?: string;
+  error_description?: string;
+}
+
+interface AppleIdTokenClaims {
+  sub?: string;
+  email?: string;
+  email_verified?: boolean | string;
+  is_private_email?: boolean | string;
+}
+
+interface AppleIdentityPayload {
+  email?: string;
+  name?: {
+    firstName?: string;
+    lastName?: string;
+  };
+}
+
+export function parseQueryString(value: unknown): string | undefined {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim() : undefined;
+}
+
+export function parseRequestParam(req: Request, key: string): string | undefined {
+  const queryVal = parseQueryString(req.query[key]);
+  if (queryVal) return queryVal;
+
+  const body = req.body as Record<string, unknown> | undefined;
+  const bodyVal = body ? parseQueryString(body[key]) : undefined;
+  return bodyVal;
+}
+
+function splitDisplayName(fullName?: string): { firstName: string; lastName: string } {
+  if (!fullName) return { firstName: 'User', lastName: '' };
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return { firstName: 'User', lastName: '' };
+  if (parts.length === 1) return { firstName: parts[0], lastName: '' };
+  return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+export function getOrganizationSlugFromOAuthRequest(req: Request): string | undefined {
+  // During the initial kickoff request, we expect ?org=<slug>.
+  const orgFromQuery = parseRequestParam(req, 'org');
+  if (orgFromQuery) return orgFromQuery;
+
+  // After provider redirects back, state carries the original org slug.
+  const orgFromState = parseRequestParam(req, 'state');
+  if (orgFromState) return orgFromState;
+
+  return undefined;
+}
+
+function decodeJwtPayload<T>(jwt: string): T {
+  const parts = jwt.split('.');
+  if (parts.length < 2) throw new Error('Invalid JWT format');
+
+  const payload = parts[1]
+    .replace(/-/g, '+')
+    .replace(/_/g, '/');
+
+  const padded = payload + '='.repeat((4 - (payload.length % 4)) % 4);
+  const json = Buffer.from(padded, 'base64').toString('utf-8');
+  return JSON.parse(json) as T;
+}
+
+export function parseAppleIdentityPayload(userPayload?: string): {
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+} {
+  if (!hasValue(userPayload)) {
+    return {};
+  }
+
+  try {
+    const parsed = JSON.parse(userPayload!) as AppleIdentityPayload;
+
+    return {
+      email: hasValue(parsed.email) ? parsed.email : undefined,
+      firstName: hasValue(parsed.name?.firstName) ? parsed.name?.firstName : undefined,
+      lastName: hasValue(parsed.name?.lastName) ? parsed.name?.lastName : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export function buildGoogleOAuthAuthorizeUrl(organizationSlug: string, cfg: OAuthEnvShape = env): string {
+  if (!hasValue(cfg.GOOGLE_CLIENT_ID) || !hasValue(cfg.GOOGLE_CALLBACK_URL)) {
+    throw new Error('Google OAuth is not configured');
+  }
+
+  const params = new URLSearchParams({
+    client_id: cfg.GOOGLE_CLIENT_ID!.trim(),
+    redirect_uri: cfg.GOOGLE_CALLBACK_URL!.trim(),
+    response_type: 'code',
+    scope: 'openid email profile',
+    access_type: 'offline',
+    include_granted_scopes: 'true',
+    prompt: 'consent',
+    state: organizationSlug,
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+}
+
+export function buildMicrosoftOAuthAuthorizeUrl(organizationSlug: string, cfg: OAuthEnvShape = env): string {
+  if (!hasValue(cfg.MICROSOFT_CLIENT_ID) || !hasValue(cfg.MICROSOFT_CALLBACK_URL)) {
+    throw new Error('Microsoft OAuth is not configured');
+  }
+
+  const params = new URLSearchParams({
+    client_id: cfg.MICROSOFT_CLIENT_ID!.trim(),
+    redirect_uri: cfg.MICROSOFT_CALLBACK_URL!.trim(),
+    response_type: 'code',
+    response_mode: 'query',
+    scope: 'openid profile email User.Read',
+    state: organizationSlug,
+  });
+  return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+}
+
+export function buildAppleOAuthAuthorizeUrl(organizationSlug: string, cfg: OAuthEnvShape = env): string {
+  if (!hasValue(cfg.APPLE_CLIENT_ID) || !hasValue(cfg.APPLE_CALLBACK_URL)) {
+    throw new Error('Apple Sign-In is not configured');
+  }
+
+  const params = new URLSearchParams({
+    client_id: cfg.APPLE_CLIENT_ID!.trim(),
+    redirect_uri: cfg.APPLE_CALLBACK_URL!.trim(),
+    response_type: 'code',
+    response_mode: 'form_post',
+    scope: 'name email',
+    state: organizationSlug,
+  });
+  return `https://appleid.apple.com/auth/authorize?${params.toString()}`;
+}
+
+export function getOAuthProviderAvailability(cfg: OAuthEnvShape = env): Record<OAuthProviderName, boolean> {
+  return {
+    google: hasValue(cfg.GOOGLE_CLIENT_ID) && hasValue(cfg.GOOGLE_CLIENT_SECRET) && hasValue(cfg.GOOGLE_CALLBACK_URL),
+    apple: hasValue(cfg.APPLE_CLIENT_ID) && hasValue(cfg.APPLE_CLIENT_SECRET) && hasValue(cfg.APPLE_CALLBACK_URL),
+    microsoft: hasValue(cfg.MICROSOFT_CLIENT_ID) && hasValue(cfg.MICROSOFT_CLIENT_SECRET) && hasValue(cfg.MICROSOFT_CALLBACK_URL),
+  };
+}
+
+export function getEnabledOAuthProviders(cfg: OAuthEnvShape = env): OAuthProviderName[] {
+  const availability = getOAuthProviderAvailability(cfg);
+  return (Object.keys(availability) as OAuthProviderName[]).filter((provider) => availability[provider]);
+}
 
 export const authRouter = Router();
 
@@ -41,6 +251,23 @@ authRouter.get('/session', async (req: Request, res: Response) => {
   res.json({ userId: payload.userId, organizationId: payload.organizationId, role: payload.role, user });
 });
 
+/**
+ * GET /api/auth/providers — list provider availability for login UIs.
+ * A provider is enabled only when client id + secret + callback URL are all configured.
+ */
+authRouter.get('/providers', (_req: Request, res: Response) => {
+  const availability = getOAuthProviderAvailability();
+  const enabledProviders = getEnabledOAuthProviders();
+  res.json({
+    providers: {
+      google: availability.google,
+      apple: availability.apple,
+      microsoft: availability.microsoft,
+    },
+    enabledProviders,
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Logout
 // ---------------------------------------------------------------------------
@@ -56,33 +283,296 @@ authRouter.post('/logout', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// OAuth callback stubs
+// OAuth callbacks
 // ---------------------------------------------------------------------------
 
 /**
  * GET /api/auth/google/callback
- * INTEGRATE: exchange `code` for tokens via Google OAuth2 client, then call
- * handleOAuthLogin() below with the resolved user profile.
+ * Behavior:
+ * - No code: starts OAuth by redirecting to Google consent screen.
+ * - With code: exchanges code for token, fetches user profile, creates session.
  */
-authRouter.get('/google/callback', (_req, res) => {
-  res.status(501).json({ error: 'NOT_IMPLEMENTED', message: 'Google OAuth not yet configured' });
+authRouter.get('/google/callback', async (req, res) => {
+  const providers = getOAuthProviderAvailability();
+  if (!providers.google) {
+    res.status(503).json({
+      error: 'OAUTH_PROVIDER_DISABLED',
+      message: 'Google OAuth is not configured for this environment',
+    });
+    return;
+  }
+
+  const organizationSlug = getOrganizationSlugFromOAuthRequest(req);
+  if (!organizationSlug) {
+    res.status(400).json({
+      error: 'BAD_REQUEST',
+      message: 'organization slug is required (query: ?org=<slug>)',
+    });
+    return;
+  }
+
+  const code = parseQueryString(req.query.code);
+
+  // Kick off OAuth flow when no auth code is present.
+  if (!code) {
+    const authorizeUrl = buildGoogleOAuthAuthorizeUrl(organizationSlug);
+    res.redirect(authorizeUrl);
+    return;
+  }
+
+  try {
+    const tokenBody = new URLSearchParams({
+      code,
+      client_id: env.GOOGLE_CLIENT_ID!,
+      client_secret: env.GOOGLE_CLIENT_SECRET!,
+      redirect_uri: env.GOOGLE_CALLBACK_URL!,
+      grant_type: 'authorization_code',
+    });
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenBody.toString(),
+    });
+
+    const tokenData = await tokenResponse.json() as GoogleTokenResponse;
+    if (!tokenResponse.ok || !hasValue(tokenData.access_token)) {
+      res.status(502).json({
+        error: 'OAUTH_TOKEN_EXCHANGE_FAILED',
+        message: tokenData.error_description || tokenData.error || 'Failed to exchange Google auth code',
+      });
+      return;
+    }
+
+    const profileResponse = await fetch('https://openidconnect.googleapis.com/v1/userinfo', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await profileResponse.json() as GoogleUserInfoResponse;
+
+    if (!profileResponse.ok) {
+      res.status(502).json({
+        error: 'OAUTH_PROFILE_FETCH_FAILED',
+        message: 'Failed to fetch Google user profile',
+      });
+      return;
+    }
+
+    if (!hasValue(profile.email)) {
+      res.status(400).json({
+        error: 'OAUTH_EMAIL_REQUIRED',
+        message: 'Google account email is required',
+      });
+      return;
+    }
+
+    const names = splitDisplayName(profile.name);
+    const firstName = hasValue(profile.given_name) ? profile.given_name! : names.firstName;
+    const lastName = hasValue(profile.family_name) ? profile.family_name! : names.lastName;
+
+    await handleOAuthLogin(res, {
+      email: profile.email!,
+      firstName,
+      lastName,
+      profileImageUrl: hasValue(profile.picture) ? profile.picture : undefined,
+      organizationSlug,
+    });
+  } catch (error) {
+    console.error('[Auth] Google OAuth callback failed:', error);
+    res.status(502).json({
+      error: 'OAUTH_CALLBACK_FAILED',
+      message: 'Google OAuth login failed',
+    });
+  }
 });
 
 /**
- * GET /api/auth/apple/callback
- * INTEGRATE: Apple Sign-In uses POST with an id_token. Verify with Apple's
- * public keys, decode claims, call handleOAuthLogin().
+ * /api/auth/apple/callback
+ * - No code: starts Apple Sign-In redirect.
+ * - With code: exchanges code for token and reads claims from id_token.
  */
-authRouter.post('/apple/callback', (_req, res) => {
-  res.status(501).json({ error: 'NOT_IMPLEMENTED', message: 'Apple Sign-In not yet configured' });
-});
+const handleAppleCallback = async (req: Request, res: Response): Promise<void> => {
+  const providers = getOAuthProviderAvailability();
+  if (!providers.apple) {
+    res.status(503).json({
+      error: 'OAUTH_PROVIDER_DISABLED',
+      message: 'Apple Sign-In is not configured for this environment',
+    });
+    return;
+  }
+
+  const organizationSlug = getOrganizationSlugFromOAuthRequest(req);
+  if (!organizationSlug) {
+    res.status(400).json({
+      error: 'BAD_REQUEST',
+      message: 'organization slug is required (query/body: org or state)',
+    });
+    return;
+  }
+
+  const code = parseRequestParam(req, 'code');
+  const appleIdentity = parseAppleIdentityPayload(parseRequestParam(req, 'user'));
+
+  if (!code) {
+    const authorizeUrl = buildAppleOAuthAuthorizeUrl(organizationSlug);
+    res.redirect(authorizeUrl);
+    return;
+  }
+
+  try {
+    const tokenBody = new URLSearchParams({
+      code,
+      client_id: env.APPLE_CLIENT_ID!,
+      client_secret: env.APPLE_CLIENT_SECRET!,
+      grant_type: 'authorization_code',
+      redirect_uri: env.APPLE_CALLBACK_URL!,
+    });
+
+    const tokenResponse = await fetch('https://appleid.apple.com/auth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenBody.toString(),
+    });
+
+    const tokenData = await tokenResponse.json() as AppleTokenResponse;
+    if (!tokenResponse.ok || !hasValue(tokenData.id_token)) {
+      res.status(502).json({
+        error: 'OAUTH_TOKEN_EXCHANGE_FAILED',
+        message: tokenData.error_description || tokenData.error || 'Failed to exchange Apple auth code',
+      });
+      return;
+    }
+
+    // Apple user profile is encoded in id_token JWT claims.
+    const claims = decodeJwtPayload<AppleIdTokenClaims>(tokenData.id_token!);
+    const email = hasValue(claims.email) ? claims.email : appleIdentity.email;
+    if (!hasValue(email)) {
+      res.status(400).json({
+        error: 'OAUTH_EMAIL_REQUIRED',
+        message: 'Apple account email is required',
+      });
+      return;
+    }
+
+    await handleOAuthLogin(res, {
+      email,
+      firstName: hasValue(appleIdentity.firstName) ? appleIdentity.firstName! : 'Apple',
+      lastName: hasValue(appleIdentity.lastName) ? appleIdentity.lastName! : 'User',
+      organizationSlug,
+    });
+  } catch (error) {
+    console.error('[Auth] Apple callback failed:', error);
+    res.status(502).json({
+      error: 'OAUTH_CALLBACK_FAILED',
+      message: 'Apple Sign-In failed',
+    });
+  }
+};
+
+authRouter.get('/apple/callback', handleAppleCallback);
+authRouter.post('/apple/callback', handleAppleCallback);
 
 /**
  * GET /api/auth/microsoft/callback
- * INTEGRATE: exchange code for tokens via MSAL, call handleOAuthLogin().
+ * - No code: starts Microsoft OAuth redirect.
+ * - With code: exchanges code, fetches profile, and creates session.
  */
-authRouter.get('/microsoft/callback', (_req, res) => {
-  res.status(501).json({ error: 'NOT_IMPLEMENTED', message: 'Microsoft OAuth not yet configured' });
+authRouter.get('/microsoft/callback', async (req, res) => {
+  const providers = getOAuthProviderAvailability();
+  if (!providers.microsoft) {
+    res.status(503).json({
+      error: 'OAUTH_PROVIDER_DISABLED',
+      message: 'Microsoft OAuth is not configured for this environment',
+    });
+    return;
+  }
+
+  const organizationSlug = getOrganizationSlugFromOAuthRequest(req);
+  if (!organizationSlug) {
+    res.status(400).json({
+      error: 'BAD_REQUEST',
+      message: 'organization slug is required (query: ?org=<slug>)',
+    });
+    return;
+  }
+
+  const code = parseRequestParam(req, 'code');
+  if (!code) {
+    const authorizeUrl = buildMicrosoftOAuthAuthorizeUrl(organizationSlug);
+    res.redirect(authorizeUrl);
+    return;
+  }
+
+  try {
+    const tokenBody = new URLSearchParams({
+      code,
+      client_id: env.MICROSOFT_CLIENT_ID!,
+      client_secret: env.MICROSOFT_CLIENT_SECRET!,
+      redirect_uri: env.MICROSOFT_CALLBACK_URL!,
+      grant_type: 'authorization_code',
+      scope: 'openid profile email User.Read',
+    });
+
+    const tokenResponse = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: tokenBody.toString(),
+    });
+
+    const tokenData = await tokenResponse.json() as MicrosoftTokenResponse;
+    if (!tokenResponse.ok || !hasValue(tokenData.access_token)) {
+      res.status(502).json({
+        error: 'OAUTH_TOKEN_EXCHANGE_FAILED',
+        message: tokenData.error_description || tokenData.error || 'Failed to exchange Microsoft auth code',
+      });
+      return;
+    }
+
+    const profileResponse = await fetch('https://graph.microsoft.com/v1.0/me?$select=displayName,givenName,surname,mail,userPrincipalName', {
+      headers: { Authorization: `Bearer ${tokenData.access_token}` },
+    });
+    const profile = await profileResponse.json() as MicrosoftGraphMeResponse;
+
+    if (!profileResponse.ok) {
+      res.status(502).json({
+        error: 'OAUTH_PROFILE_FETCH_FAILED',
+        message: 'Failed to fetch Microsoft user profile',
+      });
+      return;
+    }
+
+    const candidateEmail = hasValue(profile.mail)
+      ? profile.mail
+      : hasValue(profile.userPrincipalName)
+        ? profile.userPrincipalName
+        : undefined;
+
+    if (!hasValue(candidateEmail)) {
+      res.status(400).json({
+        error: 'OAUTH_EMAIL_REQUIRED',
+        message: 'Microsoft account email is required',
+      });
+      return;
+    }
+
+    const email = candidateEmail;
+
+    const names = splitDisplayName(profile.displayName);
+    const firstName = hasValue(profile.givenName) ? profile.givenName! : names.firstName;
+    const lastName = hasValue(profile.surname) ? profile.surname! : names.lastName;
+
+    await handleOAuthLogin(res, {
+      email,
+      firstName,
+      lastName,
+      organizationSlug,
+    });
+  } catch (error) {
+    console.error('[Auth] Microsoft callback failed:', error);
+    res.status(502).json({
+      error: 'OAUTH_CALLBACK_FAILED',
+      message: 'Microsoft OAuth login failed',
+    });
+  }
 });
 
 // ---------------------------------------------------------------------------
