@@ -38,7 +38,7 @@ export interface User {
 export interface Session {
   id: UUID;
   userId: UUID;
-  organizationId: UUID;
+  organizationId?: UUID;
   expiresAt: string; // ISO 8601 UTC
   createdAt: string; // ISO 8601 UTC
 }
