@@ -121,10 +121,10 @@ Optional notification values:
 - Do not leave placeholder values such as `your_twilio_account_sid` in deployed env files. The server now fails fast on invalid Twilio config.
 
 Default port mapping:
-- backend dev: 9001
-- backend prod: 9002
+- backend dev: 10001
+- backend prod: 9001
 - client dev: 10002
-- client prod: 10003
+- client prod: 9002
 
 ## 9. Validate service health
 
@@ -137,9 +137,10 @@ sudo systemctl status timepilot-client@dev
 sudo systemctl status timepilot-client@prod
 
 curl http://127.0.0.1:9001/health
-curl http://127.0.0.1:9002/health
+curl http://127.0.0.1:10001/health
+curl http://127.0.0.1:9001/health
 curl http://127.0.0.1:10002/health
-curl http://127.0.0.1:10003/health
+curl http://127.0.0.1:9002/health
 ```
 
 ## 10. Fast diagnostics

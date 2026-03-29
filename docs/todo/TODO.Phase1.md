@@ -169,6 +169,7 @@
   - [x] COMPLETED Run migrations with instance env loading and guarded required-value checks (scripts/ops/install-ubuntu.sh)
   - [x] COMPLETED Add bounded startup health-check retries to avoid service boot race failures (scripts/ops/install-ubuntu.sh)
   - [x] COMPLETED Add client UI systemd automation and health checks for dev/prod instances (install script + service template)
+  - [x] COMPLETED Align default dev/prod backend+client port mapping with HAProxy routing plan (install script/docs)
   - [x] COMPLETED Document dev/prod service operations and env separation policy (docs/ADMIN_SETUP_UBUNTU.md)
   - [x] COMPLETED Add deployment bootstrap README with GitHub SSH key and clone instructions (docs/DEPLOYMENT.md)
   - [ ] NOT-STARTED Validate installer end-to-end on clean Ubuntu host and capture logs

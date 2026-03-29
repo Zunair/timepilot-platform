@@ -12,10 +12,10 @@ REPO_URL=""
 BRANCH_DEV="main"
 BRANCH_PROD="main"
 INSTANCES="dev,prod"
-DEV_PORT="9001"
-PROD_PORT="9002"
+DEV_PORT="10001"
+PROD_PORT="9001"
 DEV_CLIENT_PORT="10002"
-PROD_CLIENT_PORT="10003"
+PROD_CLIENT_PORT="9002"
 SKIP_START="false"
 FORCE_ENV="false"
 NODE_MAJOR="20"
@@ -44,10 +44,10 @@ Options:
   --branch-dev <branch>     Git branch for dev instance (default: main)
   --branch-prod <branch>    Git branch for prod instance (default: main)
   --instances <csv>         Comma-separated instances (default: dev,prod)
-  --dev-port <port>         Port for dev instance (default: 9001)
-  --prod-port <port>        Port for prod instance (default: 9002)
+  --dev-port <port>         Backend port for dev instance (default: 10001)
+  --prod-port <port>        Backend port for prod instance (default: 9001)
   --dev-client-port <port>  Client port for dev instance (default: 10002)
-  --prod-client-port <port> Client port for prod instance (default: 10003)
+  --prod-client-port <port> Client port for prod instance (default: 9002)
   --log-dir <path>          Installer log directory (default: /var/log/timepilot)
   --app-user <user>         Linux user to run service (default: app)
   --app-group <group>       Linux group to run service (default: app)

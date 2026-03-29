@@ -1,10 +1,10 @@
 # Ubuntu Admin Setup (systemd multi-instance)
 
 This runbook installs TimePilot on Ubuntu with two backend service instances and two client UI service instances using systemd templates:
-- backend dev on port 9001
-- backend prod on port 9002
+- backend dev on port 10001
+- backend prod on port 9001
 - client dev on port 10002
-- client prod on port 10003
+- client prod on port 9002
 
 HAProxy is intentionally out of scope.
 
@@ -70,10 +70,10 @@ Optional port control:
 ```bash
 sudo bash scripts/ops/install-ubuntu.sh \
   --repo-url https://github.com/timepilot/platform.git \
-  --dev-port 9001 \
-  --prod-port 9002 \
+  --dev-port 10001 \
+  --prod-port 9001 \
   --dev-client-port 10002 \
-  --prod-client-port 10003
+  --prod-client-port 9002
 ```
 
 If you want to prepare files first and start services later:
@@ -105,8 +105,8 @@ Required fields include:
 - NODE_BIN
 
 Notes:
-- Default ports are dev=9001 and prod=9002.
-- Default client ports are dev=10002 and prod=10003.
+- Default backend ports are dev=10001 and prod=9001.
+- Default client ports are dev=10002 and prod=9002.
 - The installer will not auto-start an instance if SESSION_SECRET still has placeholder content.
 - The installer runs `npm run migrate` only when `DATABASE_URL`, `REDIS_URL`, and `SESSION_SECRET` are set; otherwise it logs a skip and you can rerun after updating env files.
 
@@ -157,9 +157,10 @@ Health checks:
 
 ```bash
 curl http://127.0.0.1:9001/health
-curl http://127.0.0.1:9002/health
+curl http://127.0.0.1:10001/health
+curl http://127.0.0.1:9001/health
 curl http://127.0.0.1:10002/health
-curl http://127.0.0.1:10003/health
+curl http://127.0.0.1:9002/health
 ```
 
 ## Updating code for dev/prod
