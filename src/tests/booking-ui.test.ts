@@ -58,6 +58,7 @@ describe('BOOKING_HTML JavaScript SPA', () => {
   it('includes all screen templates', () => {
     expect(BOOKING_HTML).toContain('function tmplAdmin(');
     expect(BOOKING_HTML).toContain('function tmplAdminEmpty(');
+    expect(BOOKING_HTML).toContain('function tmplLoggedOut(');
     expect(BOOKING_HTML).toContain('function tmplCalendar(');
     expect(BOOKING_HTML).toContain('function tmplNoAvailability(');
     expect(BOOKING_HTML).toContain('function tmplSlots(');
@@ -102,6 +103,21 @@ describe('BOOKING_HTML JavaScript SPA', () => {
     expect(BOOKING_HTML).toContain('Your workspace');
     expect(BOOKING_HTML).toContain('User ID:');
     expect(BOOKING_HTML).toContain('Booking link');
+  });
+
+  it('uses a dedicated logout route and signed-out template instead of raw API JSON', () => {
+    expect(BOOKING_HTML).toContain("if (path === '/logout')");
+    expect(BOOKING_HTML).toContain("apiFetch('/api/auth/logout', { method: 'POST' })");
+    expect(BOOKING_HTML).toContain("case 'logged-out':");
+    expect(BOOKING_HTML).toContain('Signed out');
+    expect(BOOKING_HTML).toContain('href="/logout"');
+  });
+
+  it('revalidates admin session on browser back/forward restores', () => {
+    expect(BOOKING_HTML).toContain("window.addEventListener('pageshow'");
+    expect(BOOKING_HTML).toContain("navType !== 'back_forward'");
+    expect(BOOKING_HTML).toContain("if (location.pathname === '/admin') {");
+    expect(BOOKING_HTML).toContain('loadSessionContext(true)');
   });
 
   it('shows a deferred email-scope enable banner after login when Gmail scope is missing', () => {
