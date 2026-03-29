@@ -551,6 +551,8 @@ start_instances() {
 health_check_instances() {
   local -a instances=()
   mapfile -t instances < <(parse_instances)
+  local startup_timeout_seconds="45"
+  local retry_interval_seconds="2"
 
   for instance in "${instances[@]}"; do
     local trimmed="$instance"
@@ -563,8 +565,29 @@ health_check_instances() {
       continue
     fi
 
-    log "Health checking $trimmed on 127.0.0.1:$port/health"
-    curl --fail --silent --show-error "http://127.0.0.1:$port/health" >/dev/null
+    log "Health checking $trimmed on 127.0.0.1:$port/health (timeout: ${startup_timeout_seconds}s)"
+
+    local elapsed="0"
+    local healthy="false"
+    while (( elapsed < startup_timeout_seconds )); do
+      if curl --fail --silent --show-error "http://127.0.0.1:$port/health" >/dev/null; then
+        healthy="true"
+        break
+      fi
+
+      if ! systemctl is-active --quiet "timepilot@$trimmed"; then
+        die "Instance '$trimmed' is not active while waiting for health check"
+      fi
+
+      sleep "$retry_interval_seconds"
+      elapsed=$((elapsed + retry_interval_seconds))
+    done
+
+    if [[ "$healthy" != "true" ]]; then
+      die "Health check timed out for '$trimmed' after ${startup_timeout_seconds}s"
+    fi
+
+    log "Health check passed for $trimmed"
   done
 }
 
