@@ -107,6 +107,7 @@ Minimum required values:
 - SESSION_SECRET
 - API_BASE_URL
 - CLIENT_BASE_URL
+- CLIENT_PORT
 - PORT
 - APP_DIR
 - NODE_BIN
@@ -125,6 +126,11 @@ Default port mapping:
 - backend prod: 9001
 - client dev: 10002
 - client prod: 9002
+
+Client service note:
+- `CLIENT_PORT` controls the client service listen port.
+- `CLIENT_BASE_URL` is the public/browser URL base and can be a domain without a port.
+- When the browser is served from a public domain through HAProxy, client-side API and SSO links automatically use same-origin if `API_BASE_URL` is an internal loopback address.
 
 ## 9. Validate service health
 

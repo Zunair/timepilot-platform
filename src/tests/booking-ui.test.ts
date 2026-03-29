@@ -76,6 +76,12 @@ describe('BOOKING_HTML JavaScript SPA', () => {
     expect(BOOKING_HTML).toContain("buildAuthHref('/api/auth/google/callback')");
   });
 
+  it('falls back to same-origin browser API calls when configured API base is loopback', () => {
+    expect(BOOKING_HTML).toContain('function resolveBrowserApiBase()');
+    expect(BOOKING_HTML).toContain("!isLoopbackHost(location.hostname) && isLoopbackHost(configuredUrl.hostname)");
+    expect(BOOKING_HTML).toContain("return location.origin;");
+  });
+
   it('uses post-login org/session resolution when org and user query params are absent', () => {
     expect(BOOKING_HTML).toContain('loadSessionContext(selectOrg)');
     expect(BOOKING_HTML).toContain("apiFetch('/api/auth/session')");

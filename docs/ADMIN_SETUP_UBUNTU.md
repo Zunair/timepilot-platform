@@ -101,6 +101,7 @@ Required fields include:
 - PORT
 - API_BASE_URL
 - CLIENT_BASE_URL
+- CLIENT_PORT
 - APP_DIR
 - NODE_BIN
 
@@ -109,6 +110,8 @@ Notes:
 - Default client ports are dev=10002 and prod=9002.
 - The installer will not auto-start an instance if SESSION_SECRET still has placeholder content.
 - The installer runs `npm run migrate` only when `DATABASE_URL`, `REDIS_URL`, and `SESSION_SECRET` are set; otherwise it logs a skip and you can rerun after updating env files.
+- `CLIENT_PORT` controls client process binding; `CLIENT_BASE_URL` is the browser-facing URL base.
+- When HAProxy serves the browser-facing domain, client-side API and SSO links automatically use same-origin if `API_BASE_URL` is configured as an internal loopback address.
 
 ## Service operations
 

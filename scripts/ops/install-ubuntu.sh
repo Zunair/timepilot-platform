@@ -430,6 +430,16 @@ upsert_env_var() {
   fi
 }
 
+append_env_var_if_missing() {
+  local file_path="$1"
+  local key="$2"
+  local value="$3"
+
+  if ! grep -Eq "^${key}=" "$file_path"; then
+    printf '%s=%s\n' "$key" "$value" >> "$file_path"
+  fi
+}
+
 write_env_file() {
   local instance="$1"
   local api_port="$2"
@@ -440,6 +450,9 @@ write_env_file() {
 
   if [[ -f "$env_file" && "$FORCE_ENV" != "true" ]]; then
     log "Keeping existing env file: $env_file"
+    append_env_var_if_missing "$env_file" "CLIENT_PORT" "$client_port"
+    chown "$APP_USER:$APP_GROUP" "$env_file"
+    chmod 640 "$env_file"
     return
   fi
 
@@ -452,6 +465,7 @@ write_env_file() {
   upsert_env_var "$env_file" "PORT" "$api_port"
   upsert_env_var "$env_file" "API_BASE_URL" "http://127.0.0.1:$api_port"
   upsert_env_var "$env_file" "CLIENT_BASE_URL" "http://127.0.0.1:$client_port"
+  upsert_env_var "$env_file" "CLIENT_PORT" "$client_port"
 
   upsert_env_var "$env_file" "GOOGLE_CALLBACK_URL" "http://127.0.0.1:$api_port/api/auth/google/callback"
   upsert_env_var "$env_file" "APPLE_CALLBACK_URL" "http://127.0.0.1:$api_port/api/auth/apple/callback"

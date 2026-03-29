@@ -14,7 +14,9 @@ import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { env } from './config/env.js';
 
-const clientPort = Number(new URL(env.CLIENT_BASE_URL).port || 3001);
+const clientPort = Number(
+  process.env.CLIENT_PORT || new URL(env.CLIENT_BASE_URL).port || 3001,
+);
 
 function hasValue(v?: string): boolean {
   return Boolean(v && v.trim().length > 0);
@@ -462,9 +464,28 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       linkGenerateError: null,
     };
 
+    function isLoopbackHost(hostname) {
+      return hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '::1';
+    }
+
+    function resolveBrowserApiBase() {
+      var configured = (window.__TP && window.__TP.api) || '';
+      if (!configured) return location.origin;
+
+      try {
+        var configuredUrl = new URL(configured, location.origin);
+        if (!isLoopbackHost(location.hostname) && isLoopbackHost(configuredUrl.hostname)) {
+          return location.origin;
+        }
+        return configuredUrl.origin;
+      } catch (_) {
+        return location.origin;
+      }
+    }
+
     // ─── API helper ─────────────────────────────────────────────────
     function apiFetch(path, opts) {
-      var url      = window.__TP.api + path;
+      var url      = resolveBrowserApiBase() + path;
       var fetchOpts = { credentials: 'include', headers: { 'Content-Type': 'application/json' } };
       if (opts && opts.method) fetchOpts.method = opts.method;
       if (opts && opts.body)   fetchOpts.body   = JSON.stringify(opts.body);
@@ -878,7 +899,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         var params = [];
         if (orgSlug) params.push('org=' + encodeURIComponent(orgSlug));
         params.push('returnTo=' + returnTo);
-        return window.__TP.api + providerPath + '?' + params.join('&');
+        return resolveBrowserApiBase() + providerPath + '?' + params.join('&');
       }
 
       if (providers.google) {
@@ -911,7 +932,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         return '';
       }
 
-      var enableUrl = window.__TP.api
+      var enableUrl = resolveBrowserApiBase()
         + '/api/auth/google/enable-email-scope?returnTo='
         + encodeURIComponent(location.href);
 
@@ -1051,7 +1072,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
                 + '</div>'
                 + '</div>'
                 + '<div id="qr-' + esc(lnk.token) + '" style="display:none;margin-top:10px;text-align:center">'
-                + '<img src="' + window.__TP.api + '/api/b/' + esc(lnk.token) + '/qr" alt="QR code" style="width:160px;height:160px;border:1px solid var(--border);border-radius:8px" />'
+                + '<img src="' + resolveBrowserApiBase() + '/api/b/' + esc(lnk.token) + '/qr" alt="QR code" style="width:160px;height:160px;border:1px solid var(--border);border-radius:8px" />'
                 + '<p style="margin:6px 0 0;font-size:0.75rem;color:var(--muted)">Scan to open booking page</p>'
                 + '</div>'
                 + '</div>';
@@ -1070,7 +1091,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<p style="margin-top:20px;color:var(--muted)">Manage your organizations below. Use the settings panel for team management, schedule configuration, and branding.</p>'
         + '<div class="org-select-list">' + tmplAdminOrgList(true) + '</div>'
         + '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">'
-        + '<p style="font-size:0.88rem;color:var(--muted)">Need help? <a href="' + window.__TP.api + '/api/auth/logout" style="color:var(--accent)">Sign out</a></p>'
+        + '<p style="font-size:0.88rem;color:var(--muted)">Need help? <a href="' + resolveBrowserApiBase() + '/api/auth/logout" style="color:var(--accent)">Sign out</a></p>'
         + '</div>'
         + '</div>';
     }

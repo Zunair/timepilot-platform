@@ -15,6 +15,7 @@ ExecStart=/usr/bin/bash -lc 'set -euo pipefail; \
   : "${APP_DIR:?APP_DIR not set}"; \
   : "${NODE_BIN:?NODE_BIN not set}"; \
   : "${CLIENT_BASE_URL:?CLIENT_BASE_URL not set}"; \
+  : "${CLIENT_PORT:?CLIENT_PORT not set}"; \
   cd "$APP_DIR"; \
   exec "$NODE_BIN" dist/client.js'
 
