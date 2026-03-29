@@ -57,6 +57,27 @@ export function rangesOverlap(
 }
 
 /**
+ * Return the local YYYY-MM-DD date for a UTC ISO string in a given IANA timezone.
+ * Uses en-CA locale which reliably formats as YYYY-MM-DD.
+ * DST-safe: Intl resolves the correct local date automatically.
+ */
+export function getLocalDateInTimezone(utcIso: string, timezone: string): string {
+  return new Date(utcIso).toLocaleDateString('en-CA', { timeZone: timezone });
+}
+
+/**
+ * Return local HH:mm in the given timezone for a UTC ISO string.
+ */
+export function getLocalTimeInTimezone(utcIso: string, timezone: string): string {
+  return new Date(utcIso).toLocaleTimeString('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+}
+
+/**
  * Validate that a timezone string is a supported IANA identifier on this runtime.
  */
 export function isValidTimezone(timezone: string): boolean {

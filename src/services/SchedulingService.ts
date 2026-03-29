@@ -1,7 +1,14 @@
-import { UUID, TenantContext, DayOfWeek } from '../types/index.js';
+import { UUID, TenantContext, DayOfWeek, AvailabilityType } from '../types/index.js';
 import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
 import { appointmentRepository } from '../repositories/AppointmentRepository.js';
-import { rangesOverlap, getDayOfWeekInTimezone, localDateToUTCSearchRange } from '../utils/timezone.js';
+import {
+  rangesOverlap,
+  getDayOfWeekInTimezone,
+  localDateToUTCSearchRange,
+  getLocalDateInTimezone,
+  getLocalTimeInTimezone,
+  localDateTimeInTimezoneToUTC,
+} from '../utils/timezone.js';
 
 export interface TimeSlot {
   startTime: string; // UTC ISO
@@ -14,6 +21,13 @@ export interface GetAvailableSlotsParams {
   clientTimezone:       string;
   slotDurationMinutes:  number;
   tenant:               TenantContext;
+}
+
+function addDaysToYmd(ymd: string, days: number): string {
+  const [year, month, day] = ymd.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
 }
 
 export class SchedulingService {
@@ -29,10 +43,13 @@ export class SchedulingService {
    *      slotDuration + bufferMinutes between consecutive offers.
    *   5. Remove slots that conflict with existing scheduled appointments,
    *      applying buffer padding on both sides of each candidate slot.
-   *   6. Return sorted, deduplicated slot list.
+   *   6. Sort and deduplicate.
+   *   7. Filter to only slots whose start time, in clientTimezone, falls on
+   *      the requested date — prevents adjacent-day leakage caused by the
+   *      generous UTC search range padding.
    */
   async getAvailableSlots(params: GetAvailableSlotsParams): Promise<TimeSlot[]> {
-    const { userId, date, slotDurationMinutes, tenant } = params;
+    const { userId, date, clientTimezone, slotDurationMinutes, tenant } = params;
 
     const { from: utcFrom, to: utcTo } = localDateToUTCSearchRange(date);
 
@@ -47,6 +64,8 @@ export class SchedulingService {
 
     const slotMs   = slotDurationMinutes * 60_000;
     const slots: TimeSlot[] = [];
+    const queryWindowStartMs = new Date(utcFrom).getTime();
+    const queryWindowEndMs = new Date(utcTo).getTime();
 
     for (const avail of availabilities) {
       const bufferMs = avail.bufferMinutes * 60_000;
@@ -60,8 +79,25 @@ export class SchedulingService {
         if (!avail.daysOfWeek.includes(dow)) continue;
       }
 
-      const windowStart = new Date(avail.startTime).getTime();
-      const windowEnd   = new Date(avail.endTime).getTime();
+      let windowStart = Math.max(new Date(avail.startTime).getTime(), queryWindowStartMs);
+      let windowEnd = Math.min(new Date(avail.endTime).getTime(), queryWindowEndMs);
+
+      // Weekly availability represents recurring daily hours across a date span.
+      // Build only this requested day's working window (in availability timezone)
+      // so we do not iterate across the full multi-month span.
+      if (avail.type === AvailabilityType.WEEK) {
+        const startClock = getLocalTimeInTimezone(avail.startTime, avail.timezone);
+        const endClock = getLocalTimeInTimezone(avail.endTime, avail.timezone);
+        const endDateForClock = endClock > startClock ? date : addDaysToYmd(date, 1);
+
+        const dayWindowStart = new Date(localDateTimeInTimezoneToUTC(date, startClock, avail.timezone)).getTime();
+        const dayWindowEnd = new Date(localDateTimeInTimezoneToUTC(endDateForClock, endClock, avail.timezone)).getTime();
+
+        windowStart = Math.max(windowStart, dayWindowStart);
+        windowEnd = Math.min(windowEnd, dayWindowEnd);
+      }
+
+      if (windowEnd <= windowStart) continue;
 
       let cursor = windowStart;
       while (cursor + slotMs <= windowEnd) {
@@ -88,10 +124,14 @@ export class SchedulingService {
       }
     }
 
-    // Sort and deduplicate (a date range could appear from overlapping windows).
+    // Sort, deduplicate, then enforce that every returned slot actually
+    // falls on the requested calendar date in the client's timezone.
+    // This prevents adjacent-day leakage caused by the ±14 h UTC search
+    // range pulling in records that start on the previous local day.
     return slots
       .sort((a, b) => a.startTime.localeCompare(b.startTime))
-      .filter((s, idx, arr) => idx === 0 || s.startTime !== arr[idx - 1].startTime);
+      .filter((s, idx, arr) => idx === 0 || s.startTime !== arr[idx - 1].startTime)
+      .filter(s => getLocalDateInTimezone(s.startTime, clientTimezone) === date);
   }
 
   /**

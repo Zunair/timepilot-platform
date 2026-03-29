@@ -462,6 +462,21 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       bookingLinksLoading: false,
       linkGenerating: false,
       linkGenerateError: null,
+      // Availability management
+      availabilities: [],         // [{ id, type, startTime, endTime, daysOfWeek, bufferMinutes, timezone }]
+      availabilitiesLoading: false,
+      availabilityError: null,
+      availabilityMessage: null,
+      newAvailabilityMode: 'recurring', // 'recurring' | 'one-time'
+      newAvailabilityType: 'week',
+      newAvailabilityStartDate: '',
+      newAvailabilityEndDate: '',
+      newAvailabilityStartTime: '09:00',
+      newAvailabilityEndTime: '17:00',
+      newAvailabilityDaysOfWeek: [1, 2, 3, 4, 5], // Mon-Fri
+      newAvailabilityBufferMinutes: 0,
+      newAvailabilitySaving: false,
+      editingAvailabilityId: null,
     };
 
     function isLoopbackHost(hostname) {
@@ -841,6 +856,60 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     function todayYMD()        { return localYMD(new Date()); }
     function monthLabel()      { return S.month.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }); }
 
+    function ymdToUtcDate(ymd) {
+      var parts = String(ymd || '').split('-').map(function(x) { return parseInt(x, 10); });
+      if (parts.length !== 3 || !parts[0] || !parts[1] || !parts[2]) return null;
+      return new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
+    }
+
+    function addDaysToYmd(ymd, daysToAdd) {
+      var base = ymdToUtcDate(ymd);
+      if (!base) return '';
+      base.setUTCDate(base.getUTCDate() + daysToAdd);
+      return base.toISOString().slice(0, 10);
+    }
+
+    function daysBetweenInclusive(startYmd, endYmd) {
+      var start = ymdToUtcDate(startYmd);
+      var end = ymdToUtcDate(endYmd);
+      if (!start || !end) return 0;
+      var diff = end.getTime() - start.getTime();
+      if (diff < 0) return 0;
+      return Math.floor(diff / 86400000) + 1;
+    }
+
+    function fmtYmdInTimezone(utcIso, tz) {
+      return new Date(utcIso).toLocaleDateString('en-CA', {
+        timeZone: tz,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
+    }
+
+    function fmtTimeInTimezone(utcIso, tz) {
+      return new Date(utcIso).toLocaleTimeString(navigator.language, {
+        timeZone: tz,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+    }
+
+    function availabilityTypeDescription(type) {
+      switch (type) {
+        case 'hour':
+          return 'Hourly slot: applies one exact time window on each selected date in the range.';
+        case 'day':
+          return 'Single day: creates a working window for each date in the selected range.';
+        case 'month':
+          return 'Monthly window: applies the same daily hours to each date in the selected range.';
+        case 'week':
+        default:
+          return 'Weekly repeating: use a date range and pick weekdays. Only those weekdays will be bookable inside the range.';
+      }
+    }
+
     function buildYMD(year, month, day) {
       return year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
     }
@@ -967,6 +1036,16 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     function tmplAdminSettings() {
       var org = S.settingsOrg;
       if (!org) return tmplLoading();
+      var defaultDate = new Date().toISOString().slice(0, 10);
+      var isRecurring = S.newAvailabilityMode !== 'one-time';
+      var availFromDate = S.newAvailabilityStartDate || defaultDate;
+      var defaultUntilDate = (function() {
+        var parts = availFromDate.split('-').map(function(x) { return parseInt(x, 10); });
+        var d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
+        d.setUTCFullYear(d.getUTCFullYear() + 1);
+        return d.toISOString().slice(0, 10);
+      })();
+      var availUntilDate = S.newAvailabilityEndDate || defaultUntilDate;
       return '<div class="card">'
         + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">'
         + '<button class="btn btn-ghost" id="settings-back" style="padding:8px 14px">&#8592; Back</button>'
@@ -1079,6 +1158,117 @@ export const BOOKING_HTML = `<!DOCTYPE html>
               }).join('')
             )
           )
+        + '</div>'
+        // ── Availability Management ────────────────────────────────
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Availability schedule</h3>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Set your available hours. Use <strong>Recurring</strong> for regular weekly hours, or <strong>One-time</strong> for a specific date.</p>'
+        + (S.availabilityError ? '<div class="alert-error">' + esc(S.availabilityError) + '</div>' : '')
+        + (S.availabilityMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.availabilityMessage) + '</p>' : '')
+        + '<form id="availability-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Add availability</h4>'
+        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
+        + '<button type="button" data-avail-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (isRecurring ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
+        + '<button type="button" data-avail-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (!isRecurring ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
+        + '</div>'
+        + (isRecurring
+          ? '<div class="form-group">'
+          + '<label>Repeat on</label>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+          + [
+            { val: 1, label: 'Mon' },
+            { val: 2, label: 'Tue' },
+            { val: 3, label: 'Wed' },
+            { val: 4, label: 'Thu' },
+            { val: 5, label: 'Fri' },
+            { val: 6, label: 'Sat' },
+            { val: 0, label: 'Sun' }
+          ].map(function(d) {
+            var checked = (S.newAvailabilityDaysOfWeek || []).indexOf(d.val) >= 0;
+            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? 'var(--accent)' : 'white') + ';color:' + (checked ? 'white' : 'inherit') + '">'
+              + '<input type="checkbox" name="dayOfWeek" value="' + d.val + '"' + (checked ? ' checked' : '') + ' style="display:none" />'
+              + esc(d.label)
+              + '</label>';
+          }).join('')
+          + '</div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group">'
+          + '<label for="avail-from-date">Active from</label>'
+          + '<input id="avail-from-date" name="fromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availFromDate) + '" />'
+          + '</div>'
+          + '<div class="form-group">'
+          + '<label for="avail-until-date">Until <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
+          + '<input id="avail-until-date" name="untilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availUntilDate) + '" />'
+          + '</div>'
+          + '</div>'
+          : '<div class="form-group">'
+          + '<label for="avail-date">Date</label>'
+          + '<input id="avail-date" name="date" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availFromDate) + '" />'
+          + '</div>'
+        )
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+        + '<div class="form-group">'
+        + '<label for="avail-start">Start time</label>'
+        + '<input id="avail-start" name="startTime" type="time" value="' + esc(S.newAvailabilityStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="avail-end">End time</label>'
+        + '<input id="avail-end" name="endTime" type="time" value="' + esc(S.newAvailabilityEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="avail-buffer">Buffer between appointments <span style="font-weight:400;color:var(--muted)">(minutes)</span></label>'
+        + '<input id="avail-buffer" name="bufferMinutes" type="number" min="0" max="480" value="' + (S.newAvailabilityBufferMinutes || 0) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '<button class="btn" type="submit"' + (S.newAvailabilitySaving ? ' disabled' : '') + '>'
+        + (S.newAvailabilitySaving ? '<span class="spinner spinner-sm"></span> Adding…' : '+ Add availability')
+        + '</button>'
+        + '</form>'
+        + (S.availabilitiesLoading
+          ? '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading availabilities…</p>'
+          : (S.availabilities.length === 0
+            ? '<p style="color:var(--muted);font-size:0.9rem">No availability rules yet. Add one above to enable bookings.</p>'
+            : '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+            + '<table style="width:100%;border-collapse:collapse;font-size:0.9rem">'
+            + '<thead style="background:var(--accent-lite);border-bottom:1px solid var(--border)">'
+            + '<tr>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Type</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Schedule</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Action</th>'
+            + '</tr>'
+            + '</thead>'
+            + '<tbody>'
+            + (S.availabilities || []).map(function(avail) {
+              var tz = avail.timezone || S.tz;
+              var startDateLocal = fmtYmdInTimezone(avail.startTime, tz);
+              var endDateLocal = fmtYmdInTimezone(avail.endTime, tz);
+              var dateLabel = startDateLocal === endDateLocal
+                ? startDateLocal
+                : (startDateLocal + ' to ' + endDateLocal);
+              var timeStr = fmtTimeInTimezone(avail.startTime, tz) + ' - ' + fmtTimeInTimezone(avail.endTime, tz);
+              var daysStr = '';
+              if (avail.type === 'week' && avail.daysOfWeek) {
+                var dayNames = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 0: 'Sun' };
+                daysStr = avail.daysOfWeek.map(function(d) { return dayNames[d] || d; }).join(', ');
+              }
+              var scheduleText = avail.type === 'week' 
+                ? (daysStr + ' | ' + dateLabel + ' | ' + timeStr + ' (' + tz + ')')
+                : (dateLabel + ' | ' + timeStr + ' (' + tz + ')');
+              var typeLabel = avail.type === 'week' ? 'Recurring' : avail.type === 'day' ? 'One-time' : avail.type.toUpperCase();
+              return '<tr style="border-bottom:1px solid var(--border)">'
+                + '<td style="padding:12px 16px"><span style="background:var(--accent-lite);padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
+                + '<td style="padding:12px 16px"><code style="font-size:0.85rem">' + esc(scheduleText) + '</code></td>'
+                + '<td style="padding:12px 16px">'
+                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-delete-avail-id="' + esc(avail.id) + '">Delete</button>'
+                + '</td>'
+                + '</tr>';
+            }).join('')
+            + '</tbody>'
+            + '</table>'
+            + '</div>'
+          )
+        )
         + '</div>';
     }
 
@@ -1471,6 +1661,35 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // Availability — delete
+      var deleteAvailBtn = e.target && e.target.closest('[data-delete-avail-id]');
+      if (deleteAvailBtn) {
+        var deleteAvailId = deleteAvailBtn.getAttribute('data-delete-avail-id');
+        if (!S.settingsOrg || !deleteAvailId) return;
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/availability/' + deleteAvailId, {
+          method: 'DELETE',
+        }).then(function() {
+          S.availabilities = (S.availabilities || []).filter(function(a) { return a.id !== deleteAvailId; });
+          S.availabilityMessage = 'Availability deleted';
+          render();
+          setTimeout(function() { S.availabilityMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.availabilityError = (err && err.message) || 'Failed to delete availability';
+          render();
+        });
+        return;
+      }
+
+      // Availability — mode toggle (Recurring / One-time)
+      var availModeBtn = e.target && e.target.closest('[data-avail-mode]');
+      if (availModeBtn) {
+        S.newAvailabilityMode = availModeBtn.getAttribute('data-avail-mode');
+        S.newAvailabilityStartDate = '';
+        S.newAvailabilityEndDate = '';
+        render();
+        return;
+      }
+
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
         S.step = 'admin';
@@ -1491,18 +1710,60 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         S.profileMessage = null;
         S.step = 'admin-settings';
         S.bookingLinksLoading = true;
+        S.availabilitiesLoading = true;
+        S.availabilityError = null;
+        S.availabilityMessage = null;
         render();
         Promise.all([
           apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
           apiFetch('/api/users/me'),
           apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
+          apiFetch('/api/organizations/' + settingsOrgId + '/availability'),
         ]).then(function(results) {
           S.settingsOrg = results[0].organization || S.settingsOrg;
           S.userProfile = results[1];
           S.bookingLinks = results[2] || [];
+          S.availabilities = results[3] || [];
           S.bookingLinksLoading = false;
+          S.availabilitiesLoading = false;
           render();
-        }).catch(function() { S.bookingLinksLoading = false; render(); });
+        }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; render(); });
+        return;
+      }
+    });
+
+    document.addEventListener('change', function(e) {
+      // Availability form — date inputs (field ids vary by mode)
+      if (e.target && (e.target.id === 'avail-from-date' || e.target.id === 'avail-date')) {
+        S.newAvailabilityStartDate = e.target.value;
+        return;
+      }
+      if (e.target && e.target.id === 'avail-until-date') {
+        S.newAvailabilityEndDate = e.target.value;
+        return;
+      }
+
+      // Availability form — time inputs
+      if (e.target && e.target.id === 'avail-start') {
+        S.newAvailabilityStartTime = e.target.value;
+        return;
+      }
+      if (e.target && e.target.id === 'avail-end') {
+        S.newAvailabilityEndTime = e.target.value;
+        return;
+      }
+
+      // Availability form — buffer minutes
+      if (e.target && e.target.id === 'avail-buffer') {
+        S.newAvailabilityBufferMinutes = parseInt(e.target.value || 0, 10);
+        return;
+      }
+
+      // Availability form — days of week
+      if (e.target && e.target.name === 'dayOfWeek') {
+        S.newAvailabilityDaysOfWeek = Array.from(document.querySelectorAll('[name="dayOfWeek"]:checked')).map(function(el) {
+          return parseInt(el.value, 10);
+        });
         return;
       }
     });
@@ -1555,6 +1816,141 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           }).catch(function(err) {
             S.profileSaving = false; S.profileError = (err && err.message) || 'Failed to save profile'; render();
           });
+        return;
+      }
+
+      // Availability form submission
+      if (e.target && e.target.id === 'availability-form') {
+        e.preventDefault();
+        if (S.newAvailabilitySaving || !S.settingsOrg) return;
+        
+        var af = e.target;
+        var isRecurringSubmit = S.newAvailabilityMode !== 'one-time';
+        var startTime = af.querySelector('[name="startTime"]').value;
+        var endTime = af.querySelector('[name="endTime"]').value;
+        var bufferMinutes = parseInt(af.querySelector('[name="bufferMinutes"]').value || 0, 10);
+        var daysOfWeek = isRecurringSubmit
+          ? Array.from(af.querySelectorAll('[name="dayOfWeek"]:checked')).map(function(el) { return parseInt(el.value, 10); })
+          : undefined;
+        var singleDate = !isRecurringSubmit ? (af.querySelector('[name="date"]') || {}).value : null;
+        var fromDate = isRecurringSubmit ? (af.querySelector('[name="fromDate"]') || {}).value : null;
+        var untilDate = isRecurringSubmit ? (af.querySelector('[name="untilDate"]') || {}).value : null;
+
+        if (!startTime || !endTime) {
+          S.availabilityError = 'Please fill in start and end time';
+          render();
+          return;
+        }
+        if (!isRecurringSubmit && !singleDate) {
+          S.availabilityError = 'Please select a date';
+          render();
+          return;
+        }
+        if (isRecurringSubmit && (!daysOfWeek || daysOfWeek.length === 0)) {
+          S.availabilityError = 'Select at least one day to repeat on';
+          render();
+          return;
+        }
+
+        // Convert local time to UTC using timezone context
+        var userTz = (S.userProfile && S.userProfile.timezone) || S.tz;
+        
+        // Helper function to convert local time in timezone to UTC ISO string
+        function convertToUTC(localDate, localTime, tz) {
+          var parts = localDate.split('-').map(function(x) { return parseInt(x, 10); });
+          var year = parts[0], month = parts[1], day = parts[2];
+          var timeParts = localTime.split(':').map(function(x) { return parseInt(x, 10); });
+          var hour = timeParts[0], minute = timeParts[1];
+          
+          var desiredUtcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+          var candidateUtcMs = desiredUtcMs;
+          
+          var formatter = new Intl.DateTimeFormat('en-CA', {
+            timeZone: tz,
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit',
+            hour12: false,
+          });
+          
+          for (var i = 0; i < 3; i++) {
+            var formatted = formatter.formatToParts(new Date(candidateUtcMs));
+            var lookup = {};
+            formatted.forEach(function(p) { lookup[p.type] = p.value; });
+            
+            var actualUtcMs = Date.UTC(
+              parseInt(lookup.year, 10),
+              parseInt(lookup.month, 10) - 1,
+              parseInt(lookup.day, 10),
+              parseInt(lookup.hour, 10),
+              parseInt(lookup.minute, 10),
+              0, 0
+            );
+            candidateUtcMs = desiredUtcMs - (actualUtcMs - desiredUtcMs);
+          }
+          
+          return new Date(candidateUtcMs).toISOString();
+        }
+        
+        var defaultDate = new Date().toISOString().slice(0, 10);
+        var payloads = [];
+        if (isRecurringSubmit) {
+          var recurFromDate = fromDate || defaultDate;
+          var defaultUntilDate = (function() {
+            var parts = recurFromDate.split('-').map(function(x) { return parseInt(x, 10); });
+            var d = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2], 0, 0, 0, 0));
+            d.setUTCFullYear(d.getUTCFullYear() + 1);
+            return d.toISOString().slice(0, 10);
+          })();
+          var recurUntilDate = untilDate || defaultUntilDate;
+          payloads.push({
+            type: 'week',
+            startTime: convertToUTC(recurFromDate, startTime, userTz),
+            endTime: convertToUTC(recurUntilDate, endTime, userTz),
+            daysOfWeek: daysOfWeek,
+            bufferMinutes: bufferMinutes,
+            timezone: userTz,
+          });
+        } else {
+          payloads.push({
+            type: 'day',
+            startTime: convertToUTC(singleDate, startTime, userTz),
+            endTime: convertToUTC(singleDate, endTime, userTz),
+            bufferMinutes: bufferMinutes,
+            timezone: userTz,
+          });
+        }
+
+        S.newAvailabilitySaving = true;
+        S.availabilityError = null;
+        S.availabilityMessage = null;
+        render();
+
+        Promise.all(payloads.map(function(payload) {
+          return apiFetch('/api/organizations/' + S.settingsOrg.id + '/availability', {
+            method: 'POST',
+            body: payload,
+          });
+        })).then(function(newAvailabilities) {
+          S.availabilities = (S.availabilities || []).concat(newAvailabilities || []);
+          S.newAvailabilitySaving = false;
+          S.availabilityMessage = 'Availability added';
+          S.newAvailabilityMode = 'recurring';
+          S.newAvailabilityStartDate = '';
+          S.newAvailabilityEndDate = '';
+          S.newAvailabilityStartTime = '09:00';
+          S.newAvailabilityEndTime = '17:00';
+          S.newAvailabilityDaysOfWeek = [1, 2, 3, 4, 5];
+          S.newAvailabilityBufferMinutes = 0;
+          render();
+          setTimeout(function() { S.availabilityMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.newAvailabilitySaving = false;
+          S.availabilityError = (err && err.message) || 'Failed to add availability';
+          render();
+        });
         return;
       }
 

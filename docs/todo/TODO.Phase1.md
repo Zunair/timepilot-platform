@@ -7,7 +7,7 @@
 # Phase 1 (MVP) - TODO
 ## Phase Status
 - State: IN-PROGRESS
-- Last Updated: 2026-03-28
+- Last Updated: 2026-03-29
 - Owner: Tech Lead
 - Active Blockers: None
 - Approval: Tech Lead
@@ -51,6 +51,9 @@
   - [x] COMPLETED Support month-based availability configuration (AvailabilityType.MONTH)
   - [x] COMPLETED Build availability conflict detection (SchedulingService + rangesOverlap)
   - [x] COMPLETED Add buffer time between appointments (bufferMinutes on Availability)
+  - [x] COMPLETED Fix slot date-leak: filter generated slots to client timezone date (SchedulingService + getLocalDateInTimezone, 4 regression tests)
+  - [x] COMPLETED Optimize recurring weekly slot generation for long active ranges (SchedulingService bounded day window; prevents year-span slot iteration/timeouts)
+  - [x] COMPLETED Simplify availability form UX: replace 4-type dropdown with Recurring/One-time toggle (src/client.ts)
 
 - [x] COMPLETED Implement appointment management
   - [x] COMPLETED Create appointment creation and validation (AppointmentService.create + slot guard)
@@ -84,6 +87,17 @@
   - [x] COMPLETED Create role permission matrix (src/utils/permissions.ts with Permission enum and hasPermission checks)
   - [x] COMPLETED Create admin dashboard endpoint (GET /api/organizations/:id/admin/dashboard with stats)
   - [x] COMPLETED Build team member management UI (list, invite, remove, change role APIs)
+  - [x] COMPLETED Add availability management UI to settings panel
+    - [x] COMPLETED Create availability form with type selector (WEEK, DAY, MONTH, HOUR)
+    - [x] COMPLETED Improve type descriptions and date-range clarity in availability form
+    - [x] COMPLETED Implement time range selection (start/end times)
+    - [x] COMPLETED Add day-of-week selector for weekly availability
+    - [x] COMPLETED Implement buffer time configuration
+    - [x] COMPLETED Display list of existing availabilities in table format
+    - [x] COMPLETED Add availability deletion with UI refresh
+    - [x] COMPLETED Load availabilities on settings panel open
+    - [x] COMPLETED Form validation and error handling
+    - [x] COMPLETED Support multiple availability windows
 
 ## Notifications System
 - [x] COMPLETED Implement email notifications

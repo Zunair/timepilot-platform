@@ -247,6 +247,139 @@ describe('SchedulingService.getAvailableSlots', () => {
 });
 
 // ============================================================================
+// Timezone date-leak regression tests
+//
+// Reproduces the bug where the ±14 h UTC search range causes an availability
+// window stored for day N in a non-UTC timezone to be returned (and slots
+// offered) when the client queries for day N+1.
+// ============================================================================
+
+describe('SchedulingService.getAvailableSlots — timezone date-leak prevention', () => {
+  beforeEach(() => {
+    vi.mocked(appointmentRepository.findConflicting).mockResolvedValue([]);
+  });
+
+  it('does not return slots from a previous local day when queried for the next day (America/New_York)', async () => {
+    // Availability created for 2026-03-30 09:00–17:00 America/New_York (EDT = UTC-4)
+    // → stored as 2026-03-30T13:00:00Z – 2026-03-30T21:00:00Z
+    // The ±14 h search range for 2026-03-31 is 2026-03-30T10:00:00Z – 2026-04-01T13:59:59Z,
+    // which overlaps this record.  Without the date filter the service would
+    // return March 30 ET slots for a March 31 query.
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2026-03-30T13:00:00.000Z', '2026-03-30T21:00:00.000Z'),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots({
+      userId:              USER_ID,
+      date:                '2026-03-31',
+      clientTimezone:      'America/New_York',
+      slotDurationMinutes: 60,
+      tenant,
+    });
+
+    expect(slots).toHaveLength(0);
+  });
+
+  it('does return slots when queried for the correct local day (America/New_York)', async () => {
+    // Same availability — should produce 8 hourly slots for 2026-03-30 query
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2026-03-30T13:00:00.000Z', '2026-03-30T21:00:00.000Z'),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots({
+      userId:              USER_ID,
+      date:                '2026-03-30',
+      clientTimezone:      'America/New_York',
+      slotDurationMinutes: 60,
+      tenant,
+    });
+
+    expect(slots.length).toBeGreaterThan(0);
+    // All returned slots must fall on 2026-03-30 in America/New_York
+    for (const slot of slots) {
+      const localDate = new Date(slot.startTime).toLocaleDateString('en-CA', {
+        timeZone: 'America/New_York',
+      });
+      expect(localDate).toBe('2026-03-30');
+    }
+  });
+
+  it('does not leak early-morning slots across local day boundary (America/New_York)', async () => {
+    // Availability 02:00–06:00 ET on 2026-03-30 (early morning of March 30)
+    // → stored as 2026-03-30T06:00:00Z – 2026-03-30T10:00:00Z
+    // The ±14 h search range for 2026-03-29 reaches 2026-03-30T13:59Z, so
+    // this record is returned by the DB query.  The date filter must drop it
+    // because all slots fall on 2026-03-30 ET, not 2026-03-29.
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2026-03-30T06:00:00.000Z', '2026-03-30T10:00:00.000Z'),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots({
+      userId:              USER_ID,
+      date:                '2026-03-29',
+      clientTimezone:      'America/New_York',
+      slotDurationMinutes: 60,
+      tenant,
+    });
+
+    expect(slots).toHaveLength(0);
+  });
+
+  it('weekly availability on single-day range does not bleed into day+1', async () => {
+    // WEEK type stored for 2026-03-30 only (Mon): 13:00–21:00Z
+    // Query for 2026-03-31 (Tue, in days_of_week) should produce 0 slots
+    // because the window itself does not contain any slots on March 31 ET.
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2026-03-30T13:00:00.000Z', '2026-03-30T21:00:00.000Z', {
+        type: AvailabilityType.WEEK,
+        daysOfWeek: [DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                     DayOfWeek.THURSDAY, DayOfWeek.FRIDAY],
+        timezone: 'America/New_York',
+      }),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots({
+      userId:              USER_ID,
+      date:                '2026-03-31',
+      clientTimezone:      'America/New_York',
+      slotDurationMinutes: 60,
+      tenant,
+    });
+
+    expect(slots).toHaveLength(0);
+  });
+
+  it('long recurring weekly range returns only requested-day working hours', async () => {
+    // Recurring Mon-Fri 09:00-17:00 ET active for over a year.
+    // The service must only produce slots for the requested date, not the full span.
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2026-04-01T13:00:00.000Z', '2027-04-29T21:00:00.000Z', {
+        type: AvailabilityType.WEEK,
+        daysOfWeek: [DayOfWeek.MONDAY, DayOfWeek.TUESDAY, DayOfWeek.WEDNESDAY,
+                     DayOfWeek.THURSDAY, DayOfWeek.FRIDAY],
+        timezone: 'America/New_York',
+      }),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots({
+      userId:              USER_ID,
+      date:                '2026-04-06', // Monday
+      clientTimezone:      'America/New_York',
+      slotDurationMinutes: 60,
+      tenant,
+    });
+
+    expect(slots).toHaveLength(8);
+    expect(new Date(slots[0].startTime).toLocaleTimeString('en-GB', {
+      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
+    })).toBe('09:00');
+    expect(new Date(slots[7].startTime).toLocaleTimeString('en-GB', {
+      timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
+    })).toBe('16:00');
+  });
+});
+
+// ============================================================================
 // SchedulingService.isSlotAvailable
 // ============================================================================
 
