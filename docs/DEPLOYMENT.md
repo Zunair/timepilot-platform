@@ -126,6 +126,8 @@ Default port mapping:
 
 ## 9. Validate service health
 
+The installer automatically waits for each started instance health endpoint (up to 45 seconds) before completing.
+
 ```bash
 sudo systemctl status timepilot@dev
 sudo systemctl status timepilot@prod
