@@ -75,6 +75,17 @@
   - [x] COMPLETED Generate booking reference/confirmation number (TP-YYYYMMDD-XXXXXXXX via src/utils/confirmation.ts)
 
 ## Settings & Configuration
+- [x] COMPLETED Add admin appointments management page
+  - [x] COMPLETED Add Appointments button on org card next to Settings in admin panel (src/client.ts)
+  - [x] COMPLETED New admin-appointments SPA step with back navigation (src/client.ts)
+  - [x] COMPLETED Display filterable list of appointments (Upcoming / Past / All tabs) per org
+  - [x] COMPLETED Show client name, email, date/time (in appointment timezone), and status per appointment
+  - [x] COMPLETED Support cancel action with confirmation dialog (POST /:id/cancel)
+  - [x] COMPLETED Support editing client details inline (PATCH /:id)
+  - [x] COMPLETED Support rescheduling appointments (POST /:id/reschedule)
+  - [x] COMPLETED Support adding new appointments from admin side (POST /appointments)
+  - [x] COMPLETED Add overlap validation regression coverage in booking UI tests (src/tests/booking-ui.test.ts)
+
 - [x] COMPLETED Build admin settings panel
   - [x] COMPLETED Create lightweight admin landing page (simple org list + user id + onboarding choices in src/client.ts)
   - [x] COMPLETED Create schedule rule configuration (shared availability endpoints in src/routes/availability.routes.ts)

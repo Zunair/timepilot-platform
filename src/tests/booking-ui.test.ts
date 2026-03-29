@@ -182,6 +182,18 @@ describe('BOOKING_HTML JavaScript SPA', () => {
     expect(settingsBackIndex).toBeGreaterThan(-1);
     expect(generateIndex).toBeLessThan(settingsBackIndex);
   });
+
+  it('defines client-side overlap validation helper for admin appointments', () => {
+    expect(BOOKING_HTML).toContain('function hasAppointmentTimeConflict(');
+    expect(BOOKING_HTML).toContain("if (!appt || appt.status === 'cancelled') continue;");
+    expect(BOOKING_HTML).toContain('var overlaps = startMs < apptEnd && endMs > apptStart;');
+  });
+
+  it('checks overlap before saving in both admin create and reschedule flows', () => {
+    expect(BOOKING_HTML).toContain('if (hasAppointmentTimeConflict(newStartTime, newEndTime, S.rescheduleApptId))');
+    expect(BOOKING_HTML).toContain('if (hasAppointmentTimeConflict(nStart, nEnd))');
+    expect(BOOKING_HTML).toContain('An appointment already exists in this time range. Choose a different time.');
+  });
 });
 
 describe('BOOKING_HTML API integration', () => {

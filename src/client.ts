@@ -477,6 +477,18 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       newAvailabilityBufferMinutes: 0,
       newAvailabilitySaving: false,
       editingAvailabilityId: null,
+      // Admin appointments page
+      appointmentsOrg: null,
+      appointments: [],
+      appointmentsLoading: false,
+      appointmentsError: null,
+      appointmentsFilter: 'upcoming',
+      editingApptId: null,
+      rescheduleApptId: null,
+      apptActionSaving: false,
+      apptActionError: null,
+      apptActionMessage: null,
+      addingAppt: false,
     };
 
     function isLoopbackHost(hostname) {
@@ -810,6 +822,23 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         .catch(function()    { S.error = 'Booking not found. The reference may be incorrect.'; S.step = 'error'; render(); });
     }
 
+    function loadAdminAppointments(orgId) {
+      S.appointmentsLoading = true;
+      S.appointmentsError = null;
+      render();
+      apiFetch('/api/organizations/' + orgId + '/appointments?limit=200')
+        .then(function(data) {
+          S.appointments = Array.isArray(data) ? data : [];
+          S.appointmentsLoading = false;
+          render();
+        })
+        .catch(function(err) {
+          S.appointmentsLoading = false;
+          S.appointmentsError = (err && err.message) || 'Failed to load appointments';
+          render();
+        });
+    }
+
     function bookAppointment(formData) {
       S.step = 'submitting'; render();
       apiFetch('/api/organizations/' + S.org.id + '/appointments', {
@@ -914,6 +943,54 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       return year + '-' + String(month + 1).padStart(2, '0') + '-' + String(day).padStart(2, '0');
     }
 
+    // Convert a local date (YYYY-MM-DD) + time (HH:MM) in the given IANA timezone to a UTC ISO string.
+    // Uses iterative Intl-based correction (same pattern as the availability form handler).
+    function convertLocalToUTC(localDate, localTime, tz) {
+      var parts = localDate.split('-').map(function(x) { return parseInt(x, 10); });
+      var year = parts[0], month = parts[1], day = parts[2];
+      var timeParts = localTime.split(':').map(function(x) { return parseInt(x, 10); });
+      var hour = timeParts[0], minute = timeParts[1];
+      var desiredUtcMs = Date.UTC(year, month - 1, day, hour, minute, 0, 0);
+      var candidateUtcMs = desiredUtcMs;
+      var formatter = new Intl.DateTimeFormat('en-CA', {
+        timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      });
+      for (var i = 0; i < 3; i++) {
+        var formatted = formatter.formatToParts(new Date(candidateUtcMs));
+        var lookup = {};
+        formatted.forEach(function(p) { lookup[p.type] = p.value; });
+        var actualUtcMs = Date.UTC(
+          parseInt(lookup.year, 10), parseInt(lookup.month, 10) - 1, parseInt(lookup.day, 10),
+          parseInt(lookup.hour, 10), parseInt(lookup.minute, 10), 0, 0
+        );
+        candidateUtcMs = desiredUtcMs - (actualUtcMs - desiredUtcMs);
+      }
+      return new Date(candidateUtcMs).toISOString();
+    }
+
+    function hasAppointmentTimeConflict(startIso, endIso, excludeAppointmentId) {
+      var startMs = new Date(startIso).getTime();
+      var endMs = new Date(endIso).getTime();
+      if (!isFinite(startMs) || !isFinite(endMs) || endMs <= startMs) return false;
+
+      var appointments = S.appointments || [];
+      for (var i = 0; i < appointments.length; i++) {
+        var appt = appointments[i];
+        if (!appt || appt.status === 'cancelled') continue;
+        if (excludeAppointmentId && appt.id === excludeAppointmentId) continue;
+
+        var apptStart = new Date(appt.startTime).getTime();
+        var apptEnd = new Date(appt.endTime).getTime();
+        if (!isFinite(apptStart) || !isFinite(apptEnd)) continue;
+
+        var overlaps = startMs < apptEnd && endMs > apptStart;
+        if (overlaps) return true;
+      }
+
+      return false;
+    }
+
     // HTML-escape user content to prevent XSS.
     function esc(str) {
       return String(str || '')
@@ -940,6 +1017,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         case 'admin':        app.innerHTML = tmplAdmin();     break;
         case 'admin-empty':  app.innerHTML = tmplAdminEmpty(); break;
         case 'admin-settings': app.innerHTML = tmplAdminSettings(); break;
+        case 'admin-appointments': app.innerHTML = tmplAdminAppointments(); break;
         case 'org-select':   app.innerHTML = tmplOrgSelection(); break;
         case 'no-availability': app.innerHTML = tmplNoAvailability(); break;
         case 'error':        app.innerHTML = tmplError();     break;
@@ -1025,11 +1103,14 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           + (showBookingLinks
               ? '<a class="btn btn-ghost" href="' + bookingHref + '">Booking link</a>'
               : '')
-          + (canSettings
+            + (canSettings
               ? '<button class="btn" data-settings-org-id="' + esc(org.id) + '">Settings</button>'
               : '')
-          + '</div>'
-          + '</div>';
+            + (canSettings
+              ? '<button class="btn btn-ghost" data-appointments-org-id="' + esc(org.id) + '">Appointments</button>'
+              : '')
+            + '</div>'
+            + '</div>';
       }).join('');
     }
 
@@ -1269,6 +1350,166 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             + '</div>'
           )
         )
+        + '</div>';
+    }
+
+    function tmplAdminAppointments() {
+      var org = S.appointmentsOrg;
+      if (!org) return tmplLoading();
+
+      var now = new Date().toISOString();
+      var allAppts = S.appointments || [];
+      var filtered = allAppts.filter(function(a) {
+        if (S.appointmentsFilter === 'upcoming') return a.startTime >= now;
+        if (S.appointmentsFilter === 'past')     return a.startTime < now;
+        return true;
+      }).slice().sort(function(a, b) {
+        var dir = S.appointmentsFilter === 'past' ? -1 : 1;
+        return dir * (new Date(a.startTime) - new Date(b.startTime));
+      });
+
+      var editAppt     = S.editingApptId    && allAppts.find(function(a) { return a.id === S.editingApptId; });
+      var reschedAppt  = S.rescheduleApptId && allAppts.find(function(a) { return a.id === S.rescheduleApptId; });
+
+      // ── Filter tabs ─────────────────────────────────────────────────
+      var filterTabs = ['upcoming', 'past', 'all'].map(function(f) {
+        var active = S.appointmentsFilter === f;
+        var label  = f === 'upcoming' ? 'Upcoming' : f === 'past' ? 'Past' : 'All';
+        return '<button type="button" data-appt-filter="' + f + '" style="padding:8px 14px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;background:'
+          + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'white' : 'var(--muted)') + '">' + label + '</button>';
+      }).join('');
+
+      // ── Edit details form ────────────────────────────────────────────
+      var editFormHtml = '';
+      if (editAppt) {
+        editFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+          + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Edit appointment details</h4>'
+          + '<form id="edit-appt-form">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group"><label>Client name</label><input name="clientName" type="text" value="' + esc(editAppt.clientName || '') + '" style="width:100%" /></div>'
+          + '<div class="form-group"><label>Client email</label><input name="clientEmail" type="email" value="' + esc(editAppt.clientEmail || '') + '" style="width:100%" /></div>'
+          + '</div>'
+          + '<div class="form-group"><label>Phone <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input name="clientPhone" type="tel" value="' + esc(editAppt.clientPhone || '') + '" style="width:100%" /></div>'
+          + '<div class="form-group"><label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea name="notes" style="width:100%">' + esc(editAppt.notes || '') + '</textarea></div>'
+          + (S.apptActionError ? '<div class="alert-error">' + esc(S.apptActionError) + '</div>' : '')
+          + '<div style="display:flex;gap:10px">'
+          + '<button class="btn" type="submit"' + (S.apptActionSaving ? ' disabled' : '') + '>' + (S.apptActionSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save changes') + '</button>'
+          + '<button class="btn btn-ghost" type="button" id="appt-edit-cancel">Cancel</button>'
+          + '</div>'
+          + '</form>'
+          + '</div>';
+      }
+
+      // ── Reschedule form ──────────────────────────────────────────────
+      var reschedFormHtml = '';
+      if (reschedAppt) {
+        var rTz = reschedAppt.timezone || S.tz;
+        reschedFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+          + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Reschedule appointment</h4>'
+          + '<p style="margin:0 0 12px;font-size:0.85rem;color:var(--muted)">Current: ' + esc(fmtYmdInTimezone(reschedAppt.startTime, rTz) + ' ' + fmtTimeInTimezone(reschedAppt.startTime, rTz) + ' (' + rTz + ')') + '</p>'
+          + '<form id="reschedule-appt-form">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group"><label>New date</label><input name="reschedDate" type="date" value="' + esc(fmtYmdInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '<div class="form-group"><label>New start time</label><input name="reschedTime" type="time" value="' + esc(fmtTimeInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '</div>'
+          + (S.apptActionError ? '<div class="alert-error">' + esc(S.apptActionError) + '</div>' : '')
+          + '<div style="display:flex;gap:10px">'
+          + '<button class="btn" type="submit"' + (S.apptActionSaving ? ' disabled' : '') + '>' + (S.apptActionSaving ? '<span class="spinner spinner-sm"></span> Moving…' : 'Move appointment') + '</button>'
+          + '<button class="btn btn-ghost" type="button" id="appt-reschedule-cancel">Cancel</button>'
+          + '</div>'
+          + '</form>'
+          + '</div>';
+      }
+
+      // ── Add appointment form ─────────────────────────────────────────
+      var addFormHtml = '';
+      if (S.addingAppt) {
+        addFormHtml = '<div style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+          + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">New appointment</h4>'
+          + '<form id="new-appt-form">'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group"><label>Client name <span style="color:var(--accent)">*</span></label><input name="clientName" type="text" required style="width:100%" /></div>'
+          + '<div class="form-group"><label>Client email <span style="color:var(--accent)">*</span></label><input name="clientEmail" type="email" required style="width:100%" /></div>'
+          + '</div>'
+          + '<div class="form-group"><label>Phone <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input name="clientPhone" type="tel" style="width:100%" /></div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'
+          + '<div class="form-group"><label>Date <span style="color:var(--accent)">*</span></label><input name="apptDate" type="date" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '<div class="form-group"><label>Start time <span style="color:var(--accent)">*</span></label><input name="apptTime" type="time" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '<div class="form-group"><label>Duration (min)</label><input name="apptDuration" type="number" min="15" max="480" value="' + (S.duration || 60) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '</div>'
+          + '<div class="form-group"><label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea name="notes" style="width:100%"></textarea></div>'
+          + (S.apptActionError ? '<div class="alert-error">' + esc(S.apptActionError) + '</div>' : '')
+          + '<div style="display:flex;gap:10px">'
+          + '<button class="btn" type="submit"' + (S.apptActionSaving ? ' disabled' : '') + '>' + (S.apptActionSaving ? '<span class="spinner spinner-sm"></span> Adding…' : 'Add appointment') + '</button>'
+          + '<button class="btn btn-ghost" type="button" id="appt-add-cancel">Cancel</button>'
+          + '</div>'
+          + '</form>'
+          + '</div>';
+      }
+
+      // ── Appointments table ───────────────────────────────────────────
+      var tableHtml = '';
+      if (S.appointmentsLoading) {
+        tableHtml = '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading appointments…</p>';
+      } else if (S.appointmentsError) {
+        tableHtml = '<div class="alert-error">' + esc(S.appointmentsError) + '</div>';
+      } else if (filtered.length === 0) {
+        tableHtml = '<p style="color:var(--muted);font-size:0.9rem">No'
+          + (S.appointmentsFilter === 'upcoming' ? ' upcoming' : S.appointmentsFilter === 'past' ? ' past' : '')
+          + ' appointments found.</p>';
+      } else {
+        tableHtml = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+          + '<table style="width:100%;border-collapse:collapse;font-size:0.88rem">'
+          + '<thead style="background:var(--accent-lite);border-bottom:1px solid var(--border)">'
+          + '<tr>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Date &amp; Time</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Client</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Status</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Actions</th>'
+          + '</tr>'
+          + '</thead>'
+          + '<tbody>'
+          + filtered.map(function(appt) {
+              var tz = appt.timezone || S.tz;
+              var dateStr = fmtYmdInTimezone(appt.startTime, tz) + ' ' + fmtTimeInTimezone(appt.startTime, tz);
+              var isCancelled = appt.status === 'cancelled';
+              var statusBg    = isCancelled ? '#fee2e2' : 'var(--accent-lite)';
+              var statusColor = isCancelled ? '#dc2626' : '#0f766e';
+              return '<tr style="border-bottom:1px solid var(--border)">'
+                + '<td style="padding:10px 16px"><code style="font-size:0.82rem">' + esc(dateStr) + '</code>'
+                + '<br><span style="font-size:0.75rem;color:var(--muted)">' + esc(tz) + '</span></td>'
+                + '<td style="padding:10px 16px">'
+                + '<div style="font-weight:600">' + esc(appt.clientName || '—') + '</div>'
+                + '<div style="font-size:0.8rem;color:var(--muted)">' + esc(appt.clientEmail || '') + '</div>'
+                + '</td>'
+                + '<td style="padding:10px 16px"><span style="background:' + statusBg + ';color:' + statusColor + ';padding:3px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(appt.status || 'unknown') + '</span></td>'
+                + '<td style="padding:10px 16px;white-space:nowrap">'
+                + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;margin-right:4px" data-edit-appt-id="' + esc(appt.id) + '">Edit</button>' : '')
+                + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;margin-right:4px" data-reschedule-appt-id="' + esc(appt.id) + '">Move</button>' : '')
+                + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-cancel-appt-id="' + esc(appt.id) + '">Cancel</button>' : '')
+                + '</td>'
+                + '</tr>';
+            }).join('')
+          + '</tbody>'
+          + '</table>'
+          + '</div>';
+      }
+
+      return '<div class="card">'
+        + '<div style="display:flex;align-items:center;gap:12px;margin-bottom:24px">'
+        + '<button class="btn btn-ghost" id="appointments-back" style="padding:8px 14px">&#8592; Back</button>'
+        + '<div><span class="chip">Appointments</span>'
+        + '<h2 style="margin:4px 0 0">' + esc(org.name) + '</h2></div>'
+        + '</div>'
+        + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">'
+        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px">' + filterTabs + '</div>'
+        + '<button class="btn" id="appt-add-toggle">' + (S.addingAppt ? '&#10005; Close' : '+ Add appointment') + '</button>'
+        + '</div>'
+        + (S.apptActionMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.apptActionMessage) + '</p>' : '')
+        + editFormHtml
+        + reschedFormHtml
+        + addFormHtml
+        + tableHtml
         + '</div>';
     }
 
@@ -1730,6 +1971,121 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; render(); });
         return;
       }
+
+      // Appointments page — open from org card
+      var appointmentsBtn = e.target && e.target.closest('[data-appointments-org-id]');
+      if (appointmentsBtn) {
+        var appointmentsOrgId = appointmentsBtn.getAttribute('data-appointments-org-id');
+        var apptOrg = (S.organizations || []).find(function(o) { return o.id === appointmentsOrgId; });
+        if (!apptOrg) return;
+        S.appointmentsOrg = apptOrg;
+        S.appointments = [];
+        S.appointmentsFilter = 'upcoming';
+        S.editingApptId = null;
+        S.rescheduleApptId = null;
+        S.apptActionError = null;
+        S.apptActionMessage = null;
+        S.addingAppt = false;
+        S.step = 'admin-appointments';
+        render();
+        loadAdminAppointments(appointmentsOrgId);
+        return;
+      }
+
+      // Appointments page — back button
+      if (e.target && e.target.id === 'appointments-back') {
+        S.step = 'admin';
+        S.appointmentsOrg = null;
+        S.appointments = [];
+        S.editingApptId = null;
+        S.rescheduleApptId = null;
+        S.apptActionError = null;
+        S.apptActionMessage = null;
+        S.addingAppt = false;
+        render();
+        return;
+      }
+
+      // Appointments page — filter tabs
+      var apptFilterBtn = e.target && e.target.closest('[data-appt-filter]');
+      if (apptFilterBtn) {
+        S.appointmentsFilter = apptFilterBtn.getAttribute('data-appt-filter');
+        S.editingApptId = null;
+        S.rescheduleApptId = null;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+
+      // Appointments page — add toggle / cancel
+      if (e.target && e.target.id === 'appt-add-toggle') {
+        S.addingAppt = !S.addingAppt;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+      if (e.target && e.target.id === 'appt-add-cancel') {
+        S.addingAppt = false;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+
+      // Appointments page — toggle edit form
+      var editApptBtn = e.target && e.target.closest('[data-edit-appt-id]');
+      if (editApptBtn) {
+        var editApptId = editApptBtn.getAttribute('data-edit-appt-id');
+        S.editingApptId = (S.editingApptId === editApptId) ? null : editApptId;
+        S.rescheduleApptId = null;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+      if (e.target && e.target.id === 'appt-edit-cancel') {
+        S.editingApptId = null;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+
+      // Appointments page — toggle reschedule form
+      var reschedApptBtn = e.target && e.target.closest('[data-reschedule-appt-id]');
+      if (reschedApptBtn) {
+        var reschedApptId = reschedApptBtn.getAttribute('data-reschedule-appt-id');
+        S.rescheduleApptId = (S.rescheduleApptId === reschedApptId) ? null : reschedApptId;
+        S.editingApptId = null;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+      if (e.target && e.target.id === 'appt-reschedule-cancel') {
+        S.rescheduleApptId = null;
+        S.apptActionError = null;
+        render();
+        return;
+      }
+
+      // Appointments page — cancel appointment
+      var cancelApptBtn = e.target && e.target.closest('[data-cancel-appt-id]');
+      if (cancelApptBtn) {
+        var cancelApptId = cancelApptBtn.getAttribute('data-cancel-appt-id');
+        if (!S.appointmentsOrg || !cancelApptId) return;
+        if (!confirm('Cancel this appointment? This cannot be undone.')) return;
+        apiFetch('/api/organizations/' + S.appointmentsOrg.id + '/appointments/' + cancelApptId + '/cancel', {
+          method: 'POST', body: {},
+        }).then(function() {
+          S.appointments = (S.appointments || []).map(function(a) {
+            return a.id === cancelApptId ? Object.assign({}, a, { status: 'cancelled' }) : a;
+          });
+          S.apptActionMessage = 'Appointment cancelled';
+          render();
+          setTimeout(function() { S.apptActionMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.apptActionError = (err && err.message) || 'Failed to cancel appointment';
+          render();
+        });
+        return;
+      }
     });
 
     document.addEventListener('change', function(e) {
@@ -1977,6 +2333,124 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           S.creatingOrganization = false;
           S.adminMessage = (err && err.message) || 'Failed to create organization';
           render();
+        });
+        return;
+      }
+
+      // Edit appointment details
+      if (e.target && e.target.id === 'edit-appt-form') {
+        e.preventDefault();
+        if (S.apptActionSaving || !S.appointmentsOrg || !S.editingApptId) return;
+        var ef = e.target;
+        var eb = {
+          clientName:  ef.querySelector('[name="clientName"]').value.trim(),
+          clientEmail: ef.querySelector('[name="clientEmail"]').value.trim(),
+          clientPhone: ef.querySelector('[name="clientPhone"]').value.trim() || undefined,
+          notes:       ef.querySelector('[name="notes"]').value.trim()       || undefined,
+        };
+        if (!eb.clientName || !eb.clientEmail) {
+          S.apptActionError = 'Name and email are required';
+          render();
+          return;
+        }
+        S.apptActionSaving = true; S.apptActionError = null; render();
+        apiFetch('/api/organizations/' + S.appointmentsOrg.id + '/appointments/' + S.editingApptId, {
+          method: 'PATCH', body: eb,
+        }).then(function(updated) {
+          S.appointments = (S.appointments || []).map(function(a) { return a.id === updated.id ? updated : a; });
+          S.apptActionSaving = false; S.editingApptId = null; S.apptActionMessage = 'Appointment updated'; render();
+          setTimeout(function() { S.apptActionMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.apptActionSaving = false; S.apptActionError = (err && err.message) || 'Failed to update appointment'; render();
+        });
+        return;
+      }
+
+      // Reschedule appointment
+      if (e.target && e.target.id === 'reschedule-appt-form') {
+        e.preventDefault();
+        if (S.apptActionSaving || !S.appointmentsOrg || !S.rescheduleApptId) return;
+        var rf = e.target;
+        var reschedDate = rf.querySelector('[name="reschedDate"]').value;
+        var reschedTime = rf.querySelector('[name="reschedTime"]').value;
+        if (!reschedDate || !reschedTime) {
+          S.apptActionError = 'Please provide a new date and time';
+          render();
+          return;
+        }
+        var apptToResched = (S.appointments || []).find(function(a) { return a.id === S.rescheduleApptId; });
+        if (!apptToResched) return;
+        var origDurationMs = new Date(apptToResched.endTime) - new Date(apptToResched.startTime);
+        var rTz = apptToResched.timezone || S.tz;
+        var newStartTime = convertLocalToUTC(reschedDate, reschedTime, rTz);
+        var newEndTime   = new Date(new Date(newStartTime).getTime() + origDurationMs).toISOString();
+        if (hasAppointmentTimeConflict(newStartTime, newEndTime, S.rescheduleApptId)) {
+          S.apptActionError = 'An appointment already exists in this time range. Choose a different time.';
+          render();
+          return;
+        }
+        S.apptActionSaving = true; S.apptActionError = null; render();
+        apiFetch('/api/organizations/' + S.appointmentsOrg.id + '/appointments/' + S.rescheduleApptId + '/reschedule', {
+          method: 'POST', body: { startTime: newStartTime, endTime: newEndTime, timezone: rTz },
+        }).then(function(updated) {
+          S.appointments = (S.appointments || []).map(function(a) { return a.id === updated.id ? updated : a; });
+          S.apptActionSaving = false; S.rescheduleApptId = null; S.apptActionMessage = 'Appointment rescheduled'; render();
+          setTimeout(function() { S.apptActionMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.apptActionSaving = false; S.apptActionError = (err && err.message) || 'Failed to reschedule appointment'; render();
+        });
+        return;
+      }
+
+      // New appointment (admin-side create)
+      if (e.target && e.target.id === 'new-appt-form') {
+        e.preventDefault();
+        if (S.apptActionSaving || !S.appointmentsOrg) return;
+        var nf = e.target;
+        var nClientName  = nf.querySelector('[name="clientName"]').value.trim();
+        var nClientEmail = nf.querySelector('[name="clientEmail"]').value.trim();
+        var nClientPhone = nf.querySelector('[name="clientPhone"]').value.trim();
+        var nApptDate    = nf.querySelector('[name="apptDate"]').value;
+        var nApptTime    = nf.querySelector('[name="apptTime"]').value;
+        var nDuration    = parseInt(nf.querySelector('[name="apptDuration"]').value || '60', 10);
+        var nNotes       = nf.querySelector('[name="notes"]').value.trim();
+        if (!nClientName || !nClientEmail || !nApptDate || !nApptTime) {
+          S.apptActionError = 'Name, email, date and time are required';
+          render();
+          return;
+        }
+        if (!nDuration || !isFinite(nDuration) || nDuration < 15) {
+          S.apptActionError = 'Duration must be at least 15 minutes';
+          render();
+          return;
+        }
+        var nTz        = (S.userProfile && S.userProfile.timezone) || S.tz;
+        var nStart     = convertLocalToUTC(nApptDate, nApptTime, nTz);
+        var nEnd       = new Date(new Date(nStart).getTime() + nDuration * 60000).toISOString();
+        if (hasAppointmentTimeConflict(nStart, nEnd)) {
+          S.apptActionError = 'An appointment already exists in this time range. Choose a different time.';
+          render();
+          return;
+        }
+        S.apptActionSaving = true; S.apptActionError = null; render();
+        apiFetch('/api/organizations/' + S.appointmentsOrg.id + '/appointments', {
+          method: 'POST',
+          body: {
+            userId:      S.userId,
+            clientName:  nClientName,
+            clientEmail: nClientEmail,
+            clientPhone: nClientPhone || undefined,
+            notes:       nNotes || undefined,
+            startTime:   nStart,
+            endTime:     nEnd,
+            timezone:    nTz,
+          },
+        }).then(function(created) {
+          S.appointments = [created].concat(S.appointments || []);
+          S.apptActionSaving = false; S.addingAppt = false; S.apptActionMessage = 'Appointment added'; render();
+          setTimeout(function() { S.apptActionMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.apptActionSaving = false; S.apptActionError = (err && err.message) || 'Failed to add appointment'; render();
         });
         return;
       }
