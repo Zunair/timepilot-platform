@@ -3,7 +3,7 @@
 This guide covers production-style deployment on Ubuntu using:
 - SSH-based GitHub access
 - Separate dev/prod code folders
-- One templated systemd service file with multiple instances
+- Templated systemd service files for backend and client instances
 - Externalized env files that survive code updates
 
 For service-level operations details, see [docs/ADMIN_SETUP_UBUNTU.md](docs/ADMIN_SETUP_UBUNTU.md).
@@ -91,8 +91,8 @@ This will:
 - install dependencies
 - update/pull both instance folders
 - build and migrate
-- install `/etc/systemd/system/timepilot@.service`
-- manage `timepilot@dev` and `timepilot@prod`
+- install `/etc/systemd/system/timepilot@.service` and `/etc/systemd/system/timepilot-client@.service`
+- manage `timepilot@dev`, `timepilot@prod`, `timepilot-client@dev`, and `timepilot-client@prod`
 - write installer logs to `/var/log/timepilot`
 
 ## 8. Configure persistent env files
@@ -121,8 +121,10 @@ Optional notification values:
 - Do not leave placeholder values such as `your_twilio_account_sid` in deployed env files. The server now fails fast on invalid Twilio config.
 
 Default port mapping:
-- dev: 9001
-- prod: 9002
+- backend dev: 9001
+- backend prod: 9002
+- client dev: 10002
+- client prod: 10003
 
 ## 9. Validate service health
 
@@ -131,9 +133,13 @@ The installer automatically waits for each started instance health endpoint (up 
 ```bash
 sudo systemctl status timepilot@dev
 sudo systemctl status timepilot@prod
+sudo systemctl status timepilot-client@dev
+sudo systemctl status timepilot-client@prod
 
 curl http://127.0.0.1:9001/health
 curl http://127.0.0.1:9002/health
+curl http://127.0.0.1:10002/health
+curl http://127.0.0.1:10003/health
 ```
 
 ## 10. Fast diagnostics
@@ -150,4 +156,6 @@ Service logs:
 ```bash
 sudo journalctl -u timepilot@dev -n 200 --no-pager
 sudo journalctl -u timepilot@prod -n 200 --no-pager
+sudo journalctl -u timepilot-client@dev -n 200 --no-pager
+sudo journalctl -u timepilot-client@prod -n 200 --no-pager
 ```

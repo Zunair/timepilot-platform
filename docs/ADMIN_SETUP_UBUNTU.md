@@ -1,8 +1,10 @@
 # Ubuntu Admin Setup (systemd multi-instance)
 
-This runbook installs TimePilot on Ubuntu with two backend service instances using one systemd template:
-- dev on port 9001
-- prod on port 9002
+This runbook installs TimePilot on Ubuntu with two backend service instances and two client UI service instances using systemd templates:
+- backend dev on port 9001
+- backend prod on port 9002
+- client dev on port 10002
+- client prod on port 10003
 
 HAProxy is intentionally out of scope.
 
@@ -18,9 +20,12 @@ For SSH key and SSH clone bootstrap steps, see [docs/DEPLOYMENT.md](docs/DEPLOYM
   - /home/app/timepilot/environments/prod.env
 - systemd template unit:
   - /etc/systemd/system/timepilot@.service
+  - /etc/systemd/system/timepilot-client@.service
 - Instance services:
   - timepilot@dev
   - timepilot@prod
+  - timepilot-client@dev
+  - timepilot-client@prod
 
 Environment files live outside release directories so deploy/update operations do not overwrite secrets or instance config.
 
@@ -60,6 +65,17 @@ sudo bash scripts/ops/install-ubuntu.sh \
   --branch-prod main
 ```
 
+Optional port control:
+
+```bash
+sudo bash scripts/ops/install-ubuntu.sh \
+  --repo-url https://github.com/timepilot/platform.git \
+  --dev-port 9001 \
+  --prod-port 9002 \
+  --dev-client-port 10002 \
+  --prod-client-port 10003
+```
+
 If you want to prepare files first and start services later:
 
 ```bash
@@ -90,6 +106,7 @@ Required fields include:
 
 Notes:
 - Default ports are dev=9001 and prod=9002.
+- Default client ports are dev=10002 and prod=10003.
 - The installer will not auto-start an instance if SESSION_SECRET still has placeholder content.
 - The installer runs `npm run migrate` only when `DATABASE_URL`, `REDIS_URL`, and `SESSION_SECRET` are set; otherwise it logs a skip and you can rerun after updating env files.
 
@@ -100,6 +117,8 @@ Status:
 ```bash
 sudo systemctl status timepilot@dev
 sudo systemctl status timepilot@prod
+sudo systemctl status timepilot-client@dev
+sudo systemctl status timepilot-client@prod
 ```
 
 Start/stop/restart one instance:
@@ -108,18 +127,21 @@ Start/stop/restart one instance:
 sudo systemctl start timepilot@dev
 sudo systemctl stop timepilot@dev
 sudo systemctl restart timepilot@dev
+sudo systemctl restart timepilot-client@dev
 ```
 
 Restart both:
 
 ```bash
 sudo systemctl restart timepilot@dev timepilot@prod
+sudo systemctl restart timepilot-client@dev timepilot-client@prod
 ```
 
 Enable on boot:
 
 ```bash
 sudo systemctl enable timepilot@dev timepilot@prod
+sudo systemctl enable timepilot-client@dev timepilot-client@prod
 ```
 
 Logs:
@@ -127,6 +149,8 @@ Logs:
 ```bash
 sudo journalctl -u timepilot@dev -f
 sudo journalctl -u timepilot@prod -f
+sudo journalctl -u timepilot-client@dev -f
+sudo journalctl -u timepilot-client@prod -f
 ```
 
 Health checks:
@@ -134,6 +158,8 @@ Health checks:
 ```bash
 curl http://127.0.0.1:9001/health
 curl http://127.0.0.1:9002/health
+curl http://127.0.0.1:10002/health
+curl http://127.0.0.1:10003/health
 ```
 
 ## Updating code for dev/prod
@@ -169,6 +195,8 @@ Service logs remain available via journalctl:
 ```bash
 sudo journalctl -u timepilot@dev -n 200 --no-pager
 sudo journalctl -u timepilot@prod -n 200 --no-pager
+sudo journalctl -u timepilot-client@dev -n 200 --no-pager
+sudo journalctl -u timepilot-client@prod -n 200 --no-pager
 ```
 
 ## Rollback basic flow

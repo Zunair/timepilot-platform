@@ -1,0 +1,28 @@
+[Unit]
+Description=TimePilot Client UI (%i)
+After=network.target
+
+[Service]
+Type=simple
+SyslogIdentifier=timepilot-client-%i
+User=__APP_USER__
+Group=__APP_GROUP__
+EnvironmentFile=__ENV_DIR__/%i.env
+Environment="NODE_ENV=production"
+Environment="PYTHONNOUSERSITE=1"
+
+ExecStart=/usr/bin/bash -lc 'set -euo pipefail; \
+  : "${APP_DIR:?APP_DIR not set}"; \
+  : "${NODE_BIN:?NODE_BIN not set}"; \
+  : "${CLIENT_BASE_URL:?CLIENT_BASE_URL not set}"; \
+  cd "$APP_DIR"; \
+  exec "$NODE_BIN" dist/client.js'
+
+Restart=always
+RestartSec=3
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

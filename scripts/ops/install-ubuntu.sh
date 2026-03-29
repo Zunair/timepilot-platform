@@ -14,6 +14,8 @@ BRANCH_PROD="main"
 INSTANCES="dev,prod"
 DEV_PORT="9001"
 PROD_PORT="9002"
+DEV_CLIENT_PORT="10002"
+PROD_CLIENT_PORT="10003"
 SKIP_START="false"
 FORCE_ENV="false"
 NODE_MAJOR="20"
@@ -44,6 +46,8 @@ Options:
   --instances <csv>         Comma-separated instances (default: dev,prod)
   --dev-port <port>         Port for dev instance (default: 9001)
   --prod-port <port>        Port for prod instance (default: 9002)
+  --dev-client-port <port>  Client port for dev instance (default: 10002)
+  --prod-client-port <port> Client port for prod instance (default: 10003)
   --log-dir <path>          Installer log directory (default: /var/log/timepilot)
   --app-user <user>         Linux user to run service (default: app)
   --app-group <group>       Linux group to run service (default: app)
@@ -107,6 +111,14 @@ parse_args() {
         PROD_PORT="${2:-}"
         shift 2
         ;;
+      --dev-client-port)
+        DEV_CLIENT_PORT="${2:-}"
+        shift 2
+        ;;
+      --prod-client-port)
+        PROD_CLIENT_PORT="${2:-}"
+        shift 2
+        ;;
       --log-dir)
         LOG_DIR="${2:-}"
         shift 2
@@ -144,6 +156,8 @@ parse_args() {
   [[ -n "$REPO_URL" ]] || die "--repo-url is required"
   validate_port "$DEV_PORT"
   validate_port "$PROD_PORT"
+  validate_port "$DEV_CLIENT_PORT"
+  validate_port "$PROD_CLIENT_PORT"
 
   ENV_DIR="$BASE_DIR/environments"
 }
@@ -160,14 +174,14 @@ setup_logging() {
   log "Writing installer logs to $LOG_FILE"
 }
 
-collect_service_diagnostics() {
-  local instance="$1"
+collect_unit_diagnostics() {
+  local unit_name="$1"
 
-  log "Diagnostics: systemctl status timepilot@$instance"
-  systemctl status "timepilot@$instance" --no-pager || true
+  log "Diagnostics: systemctl status $unit_name"
+  systemctl status "$unit_name" --no-pager || true
 
-  log "Diagnostics: recent journal for timepilot@$instance"
-  journalctl -u "timepilot@$instance" -n 120 --no-pager || true
+  log "Diagnostics: recent journal for $unit_name"
+  journalctl -u "$unit_name" -n 120 --no-pager || true
 }
 
 collect_runtime_diagnostics() {
@@ -176,7 +190,8 @@ collect_runtime_diagnostics() {
   if command -v systemctl >/dev/null 2>&1; then
     mapfile -t instances < <(parse_instances)
     for instance in "${instances[@]}"; do
-      collect_service_diagnostics "$instance"
+      collect_unit_diagnostics "timepilot@$instance"
+      collect_unit_diagnostics "timepilot-client@$instance"
     done
   fi
 
@@ -417,7 +432,8 @@ upsert_env_var() {
 
 write_env_file() {
   local instance="$1"
-  local port="$2"
+  local api_port="$2"
+  local client_port="$3"
   local app_dir="$BASE_DIR/$instance"
   local env_file="$ENV_DIR/$instance.env"
   local template_file="$app_dir/.env.example"
@@ -433,13 +449,13 @@ write_env_file() {
   cp "$template_file" "$env_file"
 
   upsert_env_var "$env_file" "NODE_ENV" "production"
-  upsert_env_var "$env_file" "PORT" "$port"
-  upsert_env_var "$env_file" "API_BASE_URL" "http://127.0.0.1:$port"
-  upsert_env_var "$env_file" "CLIENT_BASE_URL" "http://127.0.0.1:3001"
+  upsert_env_var "$env_file" "PORT" "$api_port"
+  upsert_env_var "$env_file" "API_BASE_URL" "http://127.0.0.1:$api_port"
+  upsert_env_var "$env_file" "CLIENT_BASE_URL" "http://127.0.0.1:$client_port"
 
-  upsert_env_var "$env_file" "GOOGLE_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/google/callback"
-  upsert_env_var "$env_file" "APPLE_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/apple/callback"
-  upsert_env_var "$env_file" "MICROSOFT_CALLBACK_URL" "http://127.0.0.1:$port/api/auth/microsoft/callback"
+  upsert_env_var "$env_file" "GOOGLE_CALLBACK_URL" "http://127.0.0.1:$api_port/api/auth/google/callback"
+  upsert_env_var "$env_file" "APPLE_CALLBACK_URL" "http://127.0.0.1:$api_port/api/auth/apple/callback"
+  upsert_env_var "$env_file" "MICROSOFT_CALLBACK_URL" "http://127.0.0.1:$api_port/api/auth/microsoft/callback"
 
   upsert_env_var "$env_file" "APP_DIR" "$app_dir"
   upsert_env_var "$env_file" "NODE_BIN" "/usr/bin/node"
@@ -448,22 +464,31 @@ write_env_file() {
   chmod 640 "$env_file"
 }
 
-install_systemd_template() {
+install_systemd_templates() {
   local script_dir
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  local template_source="$script_dir/timepilot@.service.template"
-  local service_target="/etc/systemd/system/timepilot@.service"
+  local backend_template_source="$script_dir/timepilot@.service.template"
+  local backend_target="/etc/systemd/system/timepilot@.service"
+  local client_template_source="$script_dir/timepilot-client@.service.template"
+  local client_target="/etc/systemd/system/timepilot-client@.service"
 
-  [[ -f "$template_source" ]] || die "Missing template file: $template_source"
+  [[ -f "$backend_template_source" ]] || die "Missing template file: $backend_template_source"
+  [[ -f "$client_template_source" ]] || die "Missing template file: $client_template_source"
 
   sed \
     -e "s|__APP_USER__|$APP_USER|g" \
     -e "s|__APP_GROUP__|$APP_GROUP|g" \
     -e "s|__ENV_DIR__|$ENV_DIR|g" \
-    "$template_source" > "$service_target"
+    "$backend_template_source" > "$backend_target"
 
-  chmod 644 "$service_target"
-  log "Installed systemd template: $service_target"
+  sed \
+    -e "s|__APP_USER__|$APP_USER|g" \
+    -e "s|__APP_GROUP__|$APP_GROUP|g" \
+    -e "s|__ENV_DIR__|$ENV_DIR|g" \
+    "$client_template_source" > "$client_target"
+
+  chmod 644 "$backend_target" "$client_target"
+  log "Installed systemd templates: $backend_target and $client_target"
 }
 
 instance_port() {
@@ -474,6 +499,21 @@ instance_port() {
       ;;
     prod)
       echo "$PROD_PORT"
+      ;;
+    *)
+      die "Unsupported instance '$instance'. Supported values are dev and prod."
+      ;;
+  esac
+}
+
+instance_client_port() {
+  local instance="$1"
+  case "$instance" in
+    dev)
+      echo "$DEV_CLIENT_PORT"
+      ;;
+    prod)
+      echo "$PROD_CLIENT_PORT"
       ;;
     *)
       die "Unsupported instance '$instance'. Supported values are dev and prod."
@@ -545,7 +585,43 @@ start_instances() {
     log "Enabling and restarting timepilot@$trimmed"
     systemctl enable "timepilot@$trimmed"
     systemctl restart "timepilot@$trimmed"
+
+    log "Enabling and restarting timepilot-client@$trimmed"
+    systemctl enable "timepilot-client@$trimmed"
+    systemctl restart "timepilot-client@$trimmed"
   done
+}
+
+wait_for_http_endpoint() {
+  local unit_name="$1"
+  local url="$2"
+  local startup_timeout_seconds="$3"
+  local retry_interval_seconds="$4"
+  local label="$5"
+
+  log "Health checking $label on $url (timeout: ${startup_timeout_seconds}s)"
+
+  local elapsed="0"
+  local healthy="false"
+  while (( elapsed < startup_timeout_seconds )); do
+    if curl --fail --silent --show-error "$url" >/dev/null; then
+      healthy="true"
+      break
+    fi
+
+    if ! systemctl is-active --quiet "$unit_name"; then
+      die "Unit '$unit_name' is not active while waiting for health check ($label)"
+    fi
+
+    sleep "$retry_interval_seconds"
+    elapsed=$((elapsed + retry_interval_seconds))
+  done
+
+  if [[ "$healthy" != "true" ]]; then
+    die "Health check timed out for '$label' after ${startup_timeout_seconds}s"
+  fi
+
+  log "Health check passed for $label"
 }
 
 health_check_instances() {
@@ -556,8 +632,10 @@ health_check_instances() {
 
   for instance in "${instances[@]}"; do
     local trimmed="$instance"
-    local port
-    port="$(instance_port "$trimmed")"
+    local api_port
+    api_port="$(instance_port "$trimmed")"
+    local client_port
+    client_port="$(instance_client_port "$trimmed")"
     local env_file="$ENV_DIR/$trimmed.env"
 
     if contains_placeholder_secrets "$env_file"; then
@@ -565,29 +643,19 @@ health_check_instances() {
       continue
     fi
 
-    log "Health checking $trimmed on 127.0.0.1:$port/health (timeout: ${startup_timeout_seconds}s)"
+    wait_for_http_endpoint \
+      "timepilot@$trimmed" \
+      "http://127.0.0.1:$api_port/health" \
+      "$startup_timeout_seconds" \
+      "$retry_interval_seconds" \
+      "$trimmed backend"
 
-    local elapsed="0"
-    local healthy="false"
-    while (( elapsed < startup_timeout_seconds )); do
-      if curl --fail --silent --show-error "http://127.0.0.1:$port/health" >/dev/null; then
-        healthy="true"
-        break
-      fi
-
-      if ! systemctl is-active --quiet "timepilot@$trimmed"; then
-        die "Instance '$trimmed' is not active while waiting for health check"
-      fi
-
-      sleep "$retry_interval_seconds"
-      elapsed=$((elapsed + retry_interval_seconds))
-    done
-
-    if [[ "$healthy" != "true" ]]; then
-      die "Health check timed out for '$trimmed' after ${startup_timeout_seconds}s"
-    fi
-
-    log "Health check passed for $trimmed"
+    wait_for_http_endpoint \
+      "timepilot-client@$trimmed" \
+      "http://127.0.0.1:$client_port/health" \
+      "$startup_timeout_seconds" \
+      "$retry_interval_seconds" \
+      "$trimmed client"
   done
 }
 
@@ -598,7 +666,7 @@ main() {
   trap 'on_error "$LINENO" "$BASH_COMMAND" "$?"' ERR
 
   log "Starting TimePilot Ubuntu installer"
-  log "Configuration: base_dir=$BASE_DIR env_dir=$ENV_DIR instances=$INSTANCES dev_port=$DEV_PORT prod_port=$PROD_PORT"
+  log "Configuration: base_dir=$BASE_DIR env_dir=$ENV_DIR instances=$INSTANCES dev_port=$DEV_PORT prod_port=$PROD_PORT dev_client_port=$DEV_CLIENT_PORT prod_client_port=$PROD_CLIENT_PORT"
   log "Configuration: repo_url=$REPO_URL branch_dev=$BRANCH_DEV branch_prod=$BRANCH_PROD app_user=$APP_USER app_group=$APP_GROUP git_user=$GIT_USER"
 
   ensure_ubuntu
@@ -622,11 +690,11 @@ main() {
 
   for instance in "${instances[@]}"; do
     clone_or_update_repo "$instance" "$(instance_branch "$instance")"
-    write_env_file "$instance" "$(instance_port "$instance")"
+    write_env_file "$instance" "$(instance_port "$instance")" "$(instance_client_port "$instance")"
     run_migrations "$instance"
   done
 
-  install_systemd_template
+  install_systemd_templates
 
   if [[ "$SKIP_START" == "true" ]]; then
     log "--skip-start set; services were not started"
@@ -637,7 +705,7 @@ main() {
 
   log "Done."
   log "Installer log saved to $LOG_FILE"
-  log "Edit env files under $ENV_DIR, then run: systemctl restart timepilot@dev timepilot@prod"
+  log "Edit env files under $ENV_DIR, then run: systemctl restart timepilot@dev timepilot@prod timepilot-client@dev timepilot-client@prod"
 }
 
 main "$@"
