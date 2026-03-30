@@ -1403,7 +1403,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         // ── Time Blocks (Unavailability) ───────────────────────────
         + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
         + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Blocked time</h3>'
-        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Block out specific hours when you\'re unavailable. Blocked time is excluded from your available booking slots.</p>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Block out specific hours when you\\'re unavailable. Blocked time is excluded from your available booking slots.</p>'
         + (S.timeBlockError ? '<div class="alert-error">' + esc(S.timeBlockError) + '</div>' : '')
         + (S.timeBlockMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.timeBlockMessage) + '</p>' : '')
         + '<form id="time-block-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
