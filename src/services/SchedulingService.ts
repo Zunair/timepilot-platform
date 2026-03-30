@@ -1,6 +1,7 @@
-import { UUID, TenantContext, DayOfWeek, AvailabilityType } from '../types/index.js';
+import { UUID, TenantContext, DayOfWeek, AvailabilityType, TimeBlockRecurrence } from '../types/index.js';
 import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
 import { appointmentRepository } from '../repositories/AppointmentRepository.js';
+import { timeBlockRepository } from '../repositories/TimeBlockRepository.js';
 import {
   rangesOverlap,
   getDayOfWeekInTimezone,
@@ -62,6 +63,41 @@ export class SchedulingService {
       userId, utcFrom, utcTo, tenant,
     );
 
+    // Fetch time blocks and compute effective blocked ranges for the requested date.
+    const timeBlocks = await timeBlockRepository.findActiveInRange(
+      userId, utcFrom, utcTo, tenant,
+    );
+    const blockedRanges: Array<{ startTime: string; endTime: string }> = [];
+
+    for (const block of timeBlocks) {
+      if (block.recurrence === TimeBlockRecurrence.WEEKLY) {
+        // Check day-of-week match using the block's own timezone (DST-safe)
+        if (block.daysOfWeek && block.daysOfWeek.length > 0) {
+          const requestedDayUTC = `${date}T12:00:00.000Z`;
+          const dow = getDayOfWeekInTimezone(requestedDayUTC, block.timezone) as DayOfWeek;
+          if (!block.daysOfWeek.includes(dow)) continue;
+        }
+        // Build the blocked window for this specific day using the block's clock times
+        const startClock = getLocalTimeInTimezone(block.startTime, block.timezone);
+        const endClock = getLocalTimeInTimezone(block.endTime, block.timezone);
+        const endDateForClock = endClock > startClock ? date : addDaysToYmd(date, 1);
+        const dayBlockStart = localDateTimeInTimezoneToUTC(date, startClock, block.timezone);
+        const dayBlockEnd = localDateTimeInTimezoneToUTC(endDateForClock, endClock, block.timezone);
+        blockedRanges.push({ startTime: dayBlockStart, endTime: dayBlockEnd });
+      } else if (block.recurrence === TimeBlockRecurrence.DAILY) {
+        // Daily: apply the block's clock times to the requested date
+        const startClock = getLocalTimeInTimezone(block.startTime, block.timezone);
+        const endClock = getLocalTimeInTimezone(block.endTime, block.timezone);
+        const endDateForClock = endClock > startClock ? date : addDaysToYmd(date, 1);
+        const dayBlockStart = localDateTimeInTimezoneToUTC(date, startClock, block.timezone);
+        const dayBlockEnd = localDateTimeInTimezoneToUTC(endDateForClock, endClock, block.timezone);
+        blockedRanges.push({ startTime: dayBlockStart, endTime: dayBlockEnd });
+      } else {
+        // One-time block: use the stored UTC range directly
+        blockedRanges.push({ startTime: block.startTime, endTime: block.endTime });
+      }
+    }
+
     const slotMs   = slotDurationMinutes * 60_000;
     const slots: TimeSlot[] = [];
     const queryWindowStartMs = new Date(utcFrom).getTime();
@@ -115,7 +151,11 @@ export class SchedulingService {
           rangesOverlap(checkStart, checkEnd, appt.startTime, appt.endTime),
         );
 
-        if (!hasConflict) {
+        const isBlocked = blockedRanges.some(br =>
+          rangesOverlap(slotStartIso, slotEndIso, br.startTime, br.endTime),
+        );
+
+        if (!hasConflict && !isBlocked) {
           slots.push({ startTime: slotStartIso, endTime: slotEndIso });
         }
 

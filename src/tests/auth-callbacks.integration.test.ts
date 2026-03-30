@@ -203,6 +203,17 @@ describe('auth callback integration (router-level)', () => {
     } as any);
   });
 
+  it('supports GET logout for sign-out links and clears the session cookie', async () => {
+    vi.mocked(sessionService.parseSessionId).mockReturnValue('session-1');
+
+    const res = await request('/api/auth/logout', { method: 'GET' });
+
+    expect(res.status).toBe(200);
+    expect(res.json()).toEqual({ message: 'Logged out' });
+    expect(sessionService.revoke).toHaveBeenCalledWith('session-1');
+    expect(String(res.headers['set-cookie'])).toContain('session_id=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
+  });
+
   it('redirects to Google authorize endpoint when callback has no code', async () => {
     const res = await request('/api/auth/google/callback?org=acme', { method: 'GET' });
 

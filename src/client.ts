@@ -477,6 +477,19 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       newAvailabilityBufferMinutes: 0,
       newAvailabilitySaving: false,
       editingAvailabilityId: null,
+      // Time blocks (unavailability)
+      timeBlocks: [],
+      timeBlocksLoading: false,
+      timeBlockError: null,
+      timeBlockMessage: null,
+      newTimeBlockMode: 'one-time',     // 'one-time' | 'recurring'
+      newTimeBlockTitle: '',
+      newTimeBlockStartDate: '',
+      newTimeBlockEndDate: '',
+      newTimeBlockStartTime: '12:00',
+      newTimeBlockEndTime: '13:00',
+      newTimeBlockDaysOfWeek: [1, 2, 3, 4, 5],
+      newTimeBlockSaving: false,
       // Admin appointments page
       appointmentsOrg: null,
       appointments: [],
@@ -559,6 +572,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
       S.duration = (isNaN(dur) || dur < 15) ? 60 : dur;
 
+      if (path === '/logout') {
+        runLogoutFlow();
+        return;
+      }
+
       if (path === '/admin') {
         loadSessionContext(true);
         return;
@@ -571,6 +589,28 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
       S.userId   = user;
       loadOrg(org);
+    }
+
+    function runLogoutFlow() {
+      S.step = 'loading';
+      render();
+
+      apiFetch('/api/auth/logout', { method: 'POST' })
+        .catch(function() {
+          return null;
+        })
+        .then(function() {
+          // Clear client-side state so restored history entries cannot show prior org data.
+          S.userId = '';
+          S.org = null;
+          S.organizations = [];
+          S.settingsOrg = null;
+          S.appointmentsOrg = null;
+          S.appointments = [];
+          S.booking = null;
+          S.step = 'logged-out';
+          render();
+        });
     }
 
     function loadSessionContext(forceOrgSelection) {
@@ -1013,6 +1053,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var app = document.getElementById('app');
       switch (S.step) {
         case 'loading':      app.innerHTML = tmplLoading();   break;
+        case 'logged-out':   app.innerHTML = tmplLoggedOut(); break;
         case 'welcome':      app.innerHTML = tmplWelcome();   break;
         case 'admin':        app.innerHTML = tmplAdmin();     break;
         case 'admin-empty':  app.innerHTML = tmplAdminEmpty(); break;
@@ -1071,6 +1112,15 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<h1 style="font-size:1.8rem">TimePilot</h1>'
         + '<p>To book an appointment, use a scheduling link shared by your host.</p>'
         + sso
+        + '</div>';
+    }
+
+    function tmplLoggedOut() {
+      return '<div class="card center-card">'
+        + '<div class="icon">&#128274;</div>'
+        + '<h1 style="font-size:1.8rem">Signed out</h1>'
+        + '<p>Your session has ended successfully.</p>'
+        + '<a class="btn" href="/">Return to start</a>'
         + '</div>';
     }
 
@@ -1350,6 +1400,123 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             + '</div>'
           )
         )
+        // ── Time Blocks (Unavailability) ───────────────────────────
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Blocked time</h3>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Block out specific hours when you\'re unavailable. Blocked time is excluded from your available booking slots.</p>'
+        + (S.timeBlockError ? '<div class="alert-error">' + esc(S.timeBlockError) + '</div>' : '')
+        + (S.timeBlockMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.timeBlockMessage) + '</p>' : '')
+        + '<form id="time-block-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Add blocked time</h4>'
+        + '<div class="form-group">'
+        + '<label for="block-title">Reason <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
+        + '<input id="block-title" name="blockTitle" type="text" placeholder="e.g. Lunch break, Team meeting, Vacation" value="' + esc(S.newTimeBlockTitle || '') + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
+        + '<button type="button" data-block-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode !== 'recurring' ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
+        + '<button type="button" data-block-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode === 'recurring' ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
+        + '</div>'
+        + (S.newTimeBlockMode === 'recurring'
+          ? '<div class="form-group">'
+          + '<label>Block on</label>'
+          + '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">'
+          + [
+            { val: 1, label: 'Mon' },
+            { val: 2, label: 'Tue' },
+            { val: 3, label: 'Wed' },
+            { val: 4, label: 'Thu' },
+            { val: 5, label: 'Fri' },
+            { val: 6, label: 'Sat' },
+            { val: 0, label: 'Sun' }
+          ].map(function(d) {
+            var checked = (S.newTimeBlockDaysOfWeek || []).indexOf(d.val) >= 0;
+            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? '#dc2626' : 'white') + ';color:' + (checked ? 'white' : 'inherit') + '">'
+              + '<input type="checkbox" name="blockDayOfWeek" value="' + d.val + '"' + (checked ? ' checked' : '') + ' style="display:none" />'
+              + esc(d.label)
+              + '</label>';
+          }).join('')
+          + '</div>'
+          + '</div>'
+          + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group">'
+          + '<label for="block-from-date">Active from</label>'
+          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
+          + '</div>'
+          + '<div class="form-group">'
+          + '<label for="block-until-date">Until <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
+          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
+          + '</div>'
+          + '</div>'
+          : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+          + '<div class="form-group">'
+          + '<label for="block-from-date">From date</label>'
+          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
+          + '</div>'
+          + '<div class="form-group">'
+          + '<label for="block-until-date">To date <span style="font-weight:400;color:var(--muted)">(optional, same day if blank)</span></label>'
+          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
+          + '</div>'
+          + '</div>'
+        )
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+        + '<div class="form-group">'
+        + '<label for="block-start-time">Start time</label>'
+        + '<input id="block-start-time" name="blockStartTime" type="time" value="' + esc(S.newTimeBlockStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="block-end-time">End time</label>'
+        + '<input id="block-end-time" name="blockEndTime" type="time" value="' + esc(S.newTimeBlockEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '</div>'
+        + '</div>'
+        + '<button class="btn" type="submit" style="background:#dc2626"' + (S.newTimeBlockSaving ? ' disabled' : '') + '>'
+        + (S.newTimeBlockSaving ? '<span class="spinner spinner-sm"></span> Blocking…' : '&#x1F6AB; Block time')
+        + '</button>'
+        + '</form>'
+        + (S.timeBlocksLoading
+          ? '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading blocked times…</p>'
+          : (S.timeBlocks.length === 0
+            ? '<p style="color:var(--muted);font-size:0.9rem">No blocked times yet. Add one above to prevent bookings during specific hours.</p>'
+            : '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+            + '<table style="width:100%;border-collapse:collapse;font-size:0.9rem">'
+            + '<thead style="background:#fef2f2;border-bottom:1px solid var(--border)">'
+            + '<tr>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Type</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Schedule</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Action</th>'
+            + '</tr>'
+            + '</thead>'
+            + '<tbody>'
+            + (S.timeBlocks || []).map(function(block) {
+              var tz = block.timezone || S.tz;
+              var startDateLocal = fmtYmdInTimezone(block.startTime, tz);
+              var endDateLocal = fmtYmdInTimezone(block.endTime, tz);
+              var dateLabel = startDateLocal === endDateLocal
+                ? startDateLocal
+                : (startDateLocal + ' to ' + endDateLocal);
+              var timeStr = fmtTimeInTimezone(block.startTime, tz) + ' - ' + fmtTimeInTimezone(block.endTime, tz);
+              var daysStr = '';
+              if (block.recurrence === 'weekly' && block.daysOfWeek) {
+                var dayNames = { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 0: 'Sun' };
+                daysStr = block.daysOfWeek.map(function(d) { return dayNames[d] || d; }).join(', ');
+              }
+              var scheduleText = block.recurrence === 'weekly'
+                ? (daysStr + ' | ' + dateLabel + ' | ' + timeStr + ' (' + tz + ')')
+                : (dateLabel + ' | ' + timeStr + ' (' + tz + ')');
+              if (block.title) scheduleText = block.title + ' — ' + scheduleText;
+              var typeLabel = block.recurrence === 'weekly' ? 'Recurring' : block.recurrence === 'daily' ? 'Daily' : 'One-time';
+              return '<tr style="border-bottom:1px solid var(--border)">'
+                + '<td style="padding:12px 16px"><span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
+                + '<td style="padding:12px 16px"><code style="font-size:0.85rem">' + esc(scheduleText) + '</code></td>'
+                + '<td style="padding:12px 16px">'
+                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-delete-block-id="' + esc(block.id) + '">Delete</button>'
+                + '</td>'
+                + '</tr>';
+            }).join('')
+            + '</tbody>'
+            + '</table>'
+            + '</div>'
+          )
+        )
         + '</div>';
     }
 
@@ -1522,7 +1689,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<p style="margin-top:20px;color:var(--muted)">Manage your organizations below. Use the settings panel for team management, schedule configuration, and branding.</p>'
         + '<div class="org-select-list">' + tmplAdminOrgList(true) + '</div>'
         + '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">'
-        + '<p style="font-size:0.88rem;color:var(--muted)">Need help? <a href="' + resolveBrowserApiBase() + '/api/auth/logout" style="color:var(--accent)">Sign out</a></p>'
+        + '<p style="font-size:0.88rem;color:var(--muted)">Need help? <a href="/logout" style="color:var(--accent)">Sign out</a></p>'
         + '</div>'
         + '</div>';
     }
@@ -1931,6 +2098,35 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // Time block — mode toggle (One-time / Recurring)
+      var blockModeBtn = e.target && e.target.closest('[data-block-mode]');
+      if (blockModeBtn) {
+        S.newTimeBlockMode = blockModeBtn.getAttribute('data-block-mode');
+        S.newTimeBlockStartDate = '';
+        S.newTimeBlockEndDate = '';
+        render();
+        return;
+      }
+
+      // Time block — delete
+      var deleteBlockBtn = e.target && e.target.closest('[data-delete-block-id]');
+      if (deleteBlockBtn) {
+        var deleteBlockId = deleteBlockBtn.getAttribute('data-delete-block-id');
+        if (!S.settingsOrg || !deleteBlockId) return;
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/time-blocks/' + deleteBlockId, {
+          method: 'DELETE',
+        }).then(function() {
+          S.timeBlocks = (S.timeBlocks || []).filter(function(b) { return b.id !== deleteBlockId; });
+          S.timeBlockMessage = 'Blocked time deleted';
+          render();
+          setTimeout(function() { S.timeBlockMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.timeBlockError = (err && err.message) || 'Failed to delete blocked time';
+          render();
+        });
+        return;
+      }
+
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
         S.step = 'admin';
@@ -1952,23 +2148,29 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         S.step = 'admin-settings';
         S.bookingLinksLoading = true;
         S.availabilitiesLoading = true;
+        S.timeBlocksLoading = true;
         S.availabilityError = null;
         S.availabilityMessage = null;
+        S.timeBlockError = null;
+        S.timeBlockMessage = null;
         render();
         Promise.all([
           apiFetch('/api/organizations/' + settingsOrgId + '/admin/dashboard'),
           apiFetch('/api/users/me'),
           apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
           apiFetch('/api/organizations/' + settingsOrgId + '/availability'),
+          apiFetch('/api/organizations/' + settingsOrgId + '/time-blocks'),
         ]).then(function(results) {
           S.settingsOrg = results[0].organization || S.settingsOrg;
           S.userProfile = results[1];
           S.bookingLinks = results[2] || [];
           S.availabilities = results[3] || [];
+          S.timeBlocks = results[4] || [];
           S.bookingLinksLoading = false;
           S.availabilitiesLoading = false;
+          S.timeBlocksLoading = false;
           render();
-        }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; render(); });
+        }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; S.timeBlocksLoading = false; render(); });
         return;
       }
 
@@ -2310,6 +2512,82 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // Time block form submission
+      if (e.target && e.target.id === 'time-block-form') {
+        e.preventDefault();
+        if (S.newTimeBlockSaving || !S.settingsOrg) return;
+
+        var bf = e.target;
+        var isRecurringBlock = S.newTimeBlockMode === 'recurring';
+        var blockStartTime = bf.querySelector('[name="blockStartTime"]').value;
+        var blockEndTime = bf.querySelector('[name="blockEndTime"]').value;
+        var blockTitle = (bf.querySelector('[name="blockTitle"]') || {}).value || '';
+        var blockFromDate = (bf.querySelector('[name="blockFromDate"]') || {}).value || '';
+        var blockUntilDate = (bf.querySelector('[name="blockUntilDate"]') || {}).value || '';
+        var blockDaysOfWeek = isRecurringBlock
+          ? Array.from(bf.querySelectorAll('[name="blockDayOfWeek"]:checked')).map(function(el) { return parseInt(el.value, 10); })
+          : undefined;
+
+        if (!blockStartTime || !blockEndTime) {
+          S.timeBlockError = 'Please fill in start and end time';
+          render();
+          return;
+        }
+        if (!blockFromDate) {
+          S.timeBlockError = 'Please select a start date';
+          render();
+          return;
+        }
+        if (isRecurringBlock && (!blockDaysOfWeek || blockDaysOfWeek.length === 0)) {
+          S.timeBlockError = 'Select at least one day to block';
+          render();
+          return;
+        }
+
+        var blockTz = (S.userProfile && S.userProfile.timezone) || S.tz;
+        var blockEndDate = blockUntilDate || blockFromDate;
+
+        var recurrence = 'none';
+        if (isRecurringBlock) recurrence = 'weekly';
+
+        var blockPayload = {
+          title: blockTitle || undefined,
+          startTime: convertLocalToUTC(blockFromDate, blockStartTime, blockTz),
+          endTime: convertLocalToUTC(blockEndDate, blockEndTime, blockTz),
+          recurrence: recurrence,
+          daysOfWeek: blockDaysOfWeek,
+          timezone: blockTz,
+        };
+
+        S.newTimeBlockSaving = true;
+        S.timeBlockError = null;
+        S.timeBlockMessage = null;
+        render();
+
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/time-blocks', {
+          method: 'POST',
+          body: blockPayload,
+        }).then(function(newBlock) {
+          S.timeBlocks = (S.timeBlocks || []).concat([newBlock]);
+          S.newTimeBlockSaving = false;
+          S.timeBlockMessage = 'Time blocked';
+          S.newTimeBlockTitle = '';
+          S.newTimeBlockStartDate = '';
+          S.newTimeBlockEndDate = '';
+          S.newTimeBlockStartTime = '12:00';
+          S.newTimeBlockEndTime = '13:00';
+          S.newTimeBlockDaysOfWeek = [1, 2, 3, 4, 5];
+          S.newTimeBlockMode = 'one-time';
+          render();
+          setTimeout(function() { S.timeBlockMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.newTimeBlockSaving = false;
+          S.timeBlockError = (err && err.message) || 'Failed to block time';
+          render();
+        });
+        return;
+      }
+
       if (e.target && e.target.id === 'create-org-form') {
         e.preventDefault();
         if (S.creatingOrganization) return;
@@ -2473,6 +2751,29 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       bookAppointment({ name: name, email: email, phone: phone, notes: notes });
     });
 
+    window.addEventListener('pageshow', function(event) {
+      var navType = null;
+      if (window.performance && typeof window.performance.getEntriesByType === 'function') {
+        var navEntries = window.performance.getEntriesByType('navigation');
+        if (navEntries && navEntries[0] && navEntries[0].type) {
+          navType = navEntries[0].type;
+        }
+      }
+
+      if (!event.persisted && navType !== 'back_forward') {
+        return;
+      }
+
+      if (location.pathname === '/admin') {
+        loadSessionContext(true);
+        return;
+      }
+
+      if (location.pathname === '/logout') {
+        runLogoutFlow();
+      }
+    });
+
     // ─── Start ───────────────────────────────────────────────────────
     boot();
   </script>
@@ -2492,7 +2793,12 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
       return;
     }
 
-    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.writeHead(200, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+      Pragma: 'no-cache',
+      Expires: '0',
+    });
     res.end(BOOKING_HTML);
   });
 

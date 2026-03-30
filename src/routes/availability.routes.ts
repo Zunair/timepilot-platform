@@ -8,6 +8,7 @@
 import { Router, Request, Response } from 'express';
 import { tenantContextMiddleware, requireRole } from '../middleware/tenantContext.js';
 import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
+import { timeBlockRepository } from '../repositories/TimeBlockRepository.js';
 import { schedulingService } from '../services/SchedulingService.js';
 import { isValidTimezone } from '../utils/timezone.js';
 import { RoleType } from '../types/index.js';
@@ -120,5 +121,76 @@ availabilityRouter.get(
     });
 
     res.json({ date, timezone, slots });
+  },
+);
+
+// ============================================================================
+// TIME BLOCKS — manage unavailability windows
+// ============================================================================
+
+export const timeBlocksRouter = Router({ mergeParams: true });
+
+/** GET /api/organizations/:organizationId/time-blocks */
+timeBlocksRouter.get(
+  '/',
+  tenantContextMiddleware,
+  async (req: Request, res: Response) => {
+    const tenant = req.tenant!;
+    const blocks = await timeBlockRepository.findByUserId(tenant.userId, tenant);
+    res.json(blocks);
+  },
+);
+
+/** POST /api/organizations/:organizationId/time-blocks */
+timeBlocksRouter.post(
+  '/',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN, RoleType.MEMBER),
+  async (req: Request, res: Response) => {
+    const tenant = req.tenant!;
+    const { title, startTime, endTime, recurrence, daysOfWeek, timezone } =
+      req.body as Record<string, unknown>;
+
+    if (!startTime || !endTime || !timezone) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'startTime, endTime, timezone required' });
+      return;
+    }
+    if (!isValidTimezone(timezone as string)) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'Invalid IANA timezone' });
+      return;
+    }
+    const validRecurrences = ['none', 'daily', 'weekly'];
+    if (recurrence && !validRecurrences.includes(recurrence as string)) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'recurrence must be none, daily, or weekly' });
+      return;
+    }
+    if (recurrence === 'weekly' && (!Array.isArray(daysOfWeek) || daysOfWeek.length === 0)) {
+      res.status(400).json({ error: 'BAD_REQUEST', message: 'daysOfWeek required for weekly recurrence' });
+      return;
+    }
+
+    const block = await timeBlockRepository.create({
+      organizationId: tenant.organizationId,
+      userId:         tenant.userId,
+      title:          title as string | undefined,
+      startTime:      startTime as string,
+      endTime:        endTime as string,
+      recurrence:     recurrence as never,
+      daysOfWeek:     daysOfWeek as never,
+      timezone:       timezone as string,
+    });
+    res.status(201).json(block);
+  },
+);
+
+/** DELETE /api/organizations/:organizationId/time-blocks/:id */
+timeBlocksRouter.delete(
+  '/:id',
+  tenantContextMiddleware,
+  requireRole(RoleType.OWNER, RoleType.ADMIN, RoleType.MEMBER),
+  async (req: Request, res: Response) => {
+    const tenant = req.tenant!;
+    await timeBlockRepository.delete(req.params.id as UUID, tenant);
+    res.status(204).send();
   },
 );

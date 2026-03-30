@@ -7,7 +7,7 @@
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { UUID, TenantContext, Availability, Appointment } from '../types/index.js';
-import { RoleType, AvailabilityType, DayOfWeek } from '../types/index.js';
+import { RoleType, AvailabilityType, DayOfWeek, TimeBlockRecurrence } from '../types/index.js';
 
 // Mock repositories before importing the service that depends on them
 vi.mock('../repositories/AvailabilityRepository.js', () => ({
@@ -22,10 +22,16 @@ vi.mock('../repositories/AppointmentRepository.js', () => ({
     cancel:          vi.fn(),
   },
 }));
+vi.mock('../repositories/TimeBlockRepository.js', () => ({
+  timeBlockRepository: {
+    findActiveInRange: vi.fn(),
+  },
+}));
 
 import { schedulingService } from '../services/SchedulingService.js';
 import { availabilityRepository } from '../repositories/AvailabilityRepository.js';
 import { appointmentRepository } from '../repositories/AppointmentRepository.js';
+import { timeBlockRepository } from '../repositories/TimeBlockRepository.js';
 
 // ============================================================================
 // Test fixtures
@@ -100,6 +106,7 @@ describe('SchedulingService.getAvailableSlots', () => {
   beforeEach(() => {
     vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([]);
     vi.mocked(appointmentRepository.findConflicting).mockResolvedValue([]);
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([]);
   });
 
   it('returns an empty array when there is no availability', async () => {
@@ -257,6 +264,7 @@ describe('SchedulingService.getAvailableSlots', () => {
 describe('SchedulingService.getAvailableSlots — timezone date-leak prevention', () => {
   beforeEach(() => {
     vi.mocked(appointmentRepository.findConflicting).mockResolvedValue([]);
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([]);
   });
 
   it('does not return slots from a previous local day when queried for the next day (America/New_York)', async () => {
@@ -376,6 +384,117 @@ describe('SchedulingService.getAvailableSlots — timezone date-leak prevention'
     expect(new Date(slots[7].startTime).toLocaleTimeString('en-GB', {
       timeZone: 'America/New_York', hour: '2-digit', minute: '2-digit', hour12: false,
     })).toBe('16:00');
+  });
+});
+
+// ============================================================================
+// SchedulingService.getAvailableSlots — time block exclusion
+// ============================================================================
+
+import type { TimeBlock } from '../types/index.js';
+
+function makeTimeBlock(
+  startTime: string,
+  endTime: string,
+  overrides: Partial<TimeBlock> = {},
+): TimeBlock {
+  return {
+    id:             'block-1' as UUID,
+    organizationId: ORG_ID,
+    userId:         USER_ID,
+    startTime,
+    endTime,
+    recurrence:     TimeBlockRecurrence.NONE,
+    timezone:       'UTC',
+    createdAt:      '2024-01-01T00:00:00.000Z',
+    updatedAt:      '2024-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+describe('SchedulingService.getAvailableSlots — time block exclusion', () => {
+  beforeEach(() => {
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([]);
+    vi.mocked(appointmentRepository.findConflicting).mockResolvedValue([]);
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([]);
+  });
+
+  it('excludes a slot that overlaps a one-time time block', async () => {
+    // Availability window 09:00-12:00 UTC → 3 hourly slots: 09, 10, 11
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2024-03-04T09:00:00.000Z', '2024-03-04T12:00:00.000Z'),
+    ]);
+    // Block 10:00-11:00 UTC → should remove the 10:00 slot
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([
+      makeTimeBlock('2024-03-04T10:00:00.000Z', '2024-03-04T11:00:00.000Z'),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots(BASE_PARAMS);
+
+    expect(slots).toHaveLength(2);
+    expect(slots.map(s => s.startTime)).toEqual([
+      '2024-03-04T09:00:00.000Z',
+      '2024-03-04T11:00:00.000Z',
+    ]);
+  });
+
+  it('excludes slots overlapping a weekly recurring block on the matching day', async () => {
+    // Availability: 09:00-12:00 UTC on 2024-03-04 (Monday)
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2024-03-04T09:00:00.000Z', '2024-03-04T12:00:00.000Z'),
+    ]);
+    // Weekly block on Mondays 10:00-11:00 UTC
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([
+      makeTimeBlock('2024-03-04T10:00:00.000Z', '2024-03-04T11:00:00.000Z', {
+        recurrence: TimeBlockRecurrence.WEEKLY,
+        daysOfWeek: [DayOfWeek.MONDAY],
+      }),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots(BASE_PARAMS);
+
+    expect(slots).toHaveLength(2);
+    expect(slots.map(s => s.startTime)).not.toContain('2024-03-04T10:00:00.000Z');
+  });
+
+  it('does NOT exclude slots when weekly block targets a different day', async () => {
+    // Availability: 09:00-12:00 UTC on 2024-03-04 (Monday)
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2024-03-04T09:00:00.000Z', '2024-03-04T12:00:00.000Z'),
+    ]);
+    // Weekly block on Wednesdays — should NOT affect Monday
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([
+      makeTimeBlock('2024-03-04T10:00:00.000Z', '2024-03-04T11:00:00.000Z', {
+        recurrence: TimeBlockRecurrence.WEEKLY,
+        daysOfWeek: [DayOfWeek.WEDNESDAY],
+      }),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots(BASE_PARAMS);
+
+    // All 3 slots should be present since block targets wrong day
+    expect(slots).toHaveLength(3);
+  });
+
+  it('excludes slots overlapping a daily recurring block', async () => {
+    // Availability: 09:00-12:00 UTC
+    vi.mocked(availabilityRepository.findActiveInRange).mockResolvedValue([
+      makeAvailability('2024-03-04T09:00:00.000Z', '2024-03-04T12:00:00.000Z'),
+    ]);
+    // Daily block 11:00-12:00 UTC — removes the 11:00 slot
+    vi.mocked(timeBlockRepository.findActiveInRange).mockResolvedValue([
+      makeTimeBlock('2024-03-04T11:00:00.000Z', '2024-03-04T12:00:00.000Z', {
+        recurrence: TimeBlockRecurrence.DAILY,
+      }),
+    ]);
+
+    const slots = await schedulingService.getAvailableSlots(BASE_PARAMS);
+
+    expect(slots).toHaveLength(2);
+    expect(slots.map(s => s.startTime)).toEqual([
+      '2024-03-04T09:00:00.000Z',
+      '2024-03-04T10:00:00.000Z',
+    ]);
   });
 });
 

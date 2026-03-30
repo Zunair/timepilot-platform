@@ -40,6 +40,7 @@ export async function runMigrations(): Promise<void> {
     { name: '003_oauth_token_lifecycle', sql: migration003 },
     { name: '004_nullable_session_org', sql: migration004 },
     { name: '005_booking_links', sql: migration005 },
+    { name: '006_time_blocks', sql: migration006 },
   ];
 
   for (const migration of migrations) {
@@ -291,4 +292,31 @@ const migration005 = `
 
   CREATE INDEX idx_booking_links_org_id ON booking_links (organization_id);
   CREATE INDEX idx_booking_links_token  ON booking_links (token);
+`;
+
+/**
+ * Migration 006: Time Blocks (Unavailability)
+ *
+ * Allows users to block out specific time ranges when they are NOT available,
+ * even if their regular availability would otherwise allow bookings.
+ * Supports one-time, daily recurring, and weekly recurring patterns.
+ */
+const migration006 = `
+  CREATE TABLE IF NOT EXISTS time_blocks (
+    id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations (id) ON DELETE CASCADE,
+    user_id         UUID NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+    title           VARCHAR(255),
+    start_time      TIMESTAMP WITH TIME ZONE NOT NULL,
+    end_time        TIMESTAMP WITH TIME ZONE NOT NULL,
+    recurrence      VARCHAR(50) NOT NULL DEFAULT 'none' CHECK (recurrence IN ('none', 'daily', 'weekly')),
+    days_of_week    INTEGER[],
+    timezone        VARCHAR(255) NOT NULL,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL
+  );
+
+  CREATE INDEX idx_time_blocks_org_id     ON time_blocks (organization_id);
+  CREATE INDEX idx_time_blocks_user_id    ON time_blocks (user_id);
+  CREATE INDEX idx_time_blocks_start_time ON time_blocks (start_time);
 `;

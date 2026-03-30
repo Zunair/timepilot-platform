@@ -809,15 +809,25 @@ authRouter.post('/providers/:provider/refresh', async (req: Request, res: Respon
 // Logout
 // ---------------------------------------------------------------------------
 
-/** POST /api/auth/logout — revoke the current session */
-authRouter.post('/logout', async (req: Request, res: Response) => {
+async function handleLogout(req: Request, res: Response): Promise<void> {
   const sessionId = sessionService.parseSessionId(req.headers.cookie);
   if (sessionId) {
-    await sessionService.revoke(sessionId as UUID).catch(() => null);
+    try {
+      await sessionService.revoke(sessionId as UUID);
+    } catch {
+      // Swallow revoke failures so cookie clearing still signs the user out client-side.
+    }
   }
   res.setHeader('Set-Cookie', 'session_id=; HttpOnly; SameSite=Strict; Max-Age=0; Path=/');
   res.json({ message: 'Logged out' });
-});
+}
+
+/**
+ * /api/auth/logout — revoke the current session and clear the cookie.
+ * Supports both POST (preferred) and GET (link/navigation fallback).
+ */
+authRouter.post('/logout', handleLogout);
+authRouter.get('/logout', handleLogout);
 
 // ---------------------------------------------------------------------------
 // OAuth callbacks

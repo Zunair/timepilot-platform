@@ -246,3 +246,23 @@ describe('BOOKING_HTML API integration', () => {
     expect(BOOKING_HTML).toContain('timezone');
   });
 });
+
+describe('BOOKING_HTML time-block UI', () => {
+  it('includes the blocked-time section heading and form', () => {
+    expect(BOOKING_HTML).toContain('Blocked time');
+    expect(BOOKING_HTML).toContain('id="time-block-form"');
+  });
+
+  it('has mode toggle buttons for one-time vs recurring blocks', () => {
+    expect(BOOKING_HTML).toContain('data-block-mode="one-time"');
+    expect(BOOKING_HTML).toContain('data-block-mode="recurring"');
+  });
+
+  it('has day-of-week checkboxes for recurring blocks', () => {
+    expect(BOOKING_HTML).toContain('blockDayOfWeek');
+  });
+
+  it('has delete controls for existing blocks', () => {
+    expect(BOOKING_HTML).toContain('data-delete-block-id');
+  });
+});

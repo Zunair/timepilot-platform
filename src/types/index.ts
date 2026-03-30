@@ -205,6 +205,36 @@ export interface Notification {
 }
 
 // ============================================================================
+// TIME BLOCKS (Unavailability)
+// ============================================================================
+
+export enum TimeBlockRecurrence {
+  NONE = 'none',
+  DAILY = 'daily',
+  WEEKLY = 'weekly',
+}
+
+/**
+ * TimeBlock represents a period when a user is NOT available for appointments.
+ * Used to block out lunch breaks, vacations, meetings, etc.
+ * Supports one-time, daily recurring, and weekly recurring patterns.
+ * All times stored in UTC with timezone context for user intent auditing.
+ */
+export interface TimeBlock {
+  id: UUID;
+  organizationId: UUID;
+  userId: UUID;
+  title?: string;
+  startTime: string; // ISO 8601 UTC
+  endTime: string; // ISO 8601 UTC
+  recurrence: TimeBlockRecurrence;
+  daysOfWeek?: DayOfWeek[]; // For weekly recurrence
+  timezone: string; // Timezone context for user intent
+  createdAt: string; // ISO 8601 UTC
+  updatedAt: string; // ISO 8601 UTC
+}
+
+// ============================================================================
 // REQUEST/RESPONSE TYPES
 // ============================================================================
 

@@ -42,6 +42,7 @@
   - [x] COMPLETED Implement secure session storage (src/repositories/SessionRepository.ts, sessions DB table)
   - [x] COMPLETED Add session timeout handling (expires_at checked on every request)
   - [x] COMPLETED Create logout and session revocation (SessionService.revoke / revokeAll)
+  - [x] COMPLETED Harden logout UX to avoid stale admin back-navigation and add minimal signed-out page (src/client.ts)
 
 ## Scheduling Engine
 - [x] COMPLETED Create scheduling engine with flexible availability
@@ -109,6 +110,15 @@
     - [x] COMPLETED Load availabilities on settings panel open
     - [x] COMPLETED Form validation and error handling
     - [x] COMPLETED Support multiple availability windows
+  - [x] COMPLETED Add time-block (unavailability) management to settings panel
+    - [x] COMPLETED Create time_blocks table migration (006_time_blocks)
+    - [x] COMPLETED Implement TimeBlockRepository with tenant isolation
+    - [x] COMPLETED Add time-block CRUD routes (GET/POST/DELETE /api/organizations/:id/time-blocks)
+    - [x] COMPLETED Integrate time blocks into SchedulingService slot generation
+    - [x] COMPLETED Support one-time, daily recurring, and weekly recurring blocks
+    - [x] COMPLETED Build time-block admin UI with form and deletion
+    - [x] COMPLETED Add scheduling test coverage for time-block exclusion
+    - [x] COMPLETED Add booking-ui smoke tests for time-block UI elements
 
 ## Notifications System
 - [x] COMPLETED Implement email notifications
