@@ -5,41 +5,65 @@
 ```
 timepilot-platform/
 ├── src/
+│   ├── server.ts            # Express app initialisation and route mounting
+│   ├── client.ts            # Booking SPA (vanilla JS, served on :3001)
 │   ├── config/              # Configuration modules
-│   │   ├── env.ts          # Environment variable loading
-│   │   └── db.ts           # Database connection pool
-│   ├── middleware/          # Express middleware
-│   │   ├── tenantContext.ts # Tenant isolation and RBAC
-│   │   └── errorHandler.ts  # Error handling and responses
-│   ├── repositories/        # Data access layer
-│   │   ├── BaseRepository.ts
-│   │   ├── OrganizationRepository.ts
-│   │   ├── UserRepository.ts
-│   │   └── OrganizationMemberRepository.ts
-│   ├── services/            # Business logic (to be implemented)
-│   ├── routes/              # API routes (to be implemented)
-│   ├── types/               # TypeScript types
-│   │   └── index.ts
+│   │   ├── env.ts           # Environment variable loading
+│   │   └── db.ts            # Database connection pool
 │   ├── db/                  # Database
 │   │   ├── migrate.ts       # Migration runner
 │   │   └── rollback.ts      # Rollback helper
-│   ├── utils/               # Utility functions (to be implemented)
-│   └── server.ts            # Express app initialization
-├── tests/                   # Test files (to be created)
+│   ├── middleware/           # Express middleware
+│   │   ├── tenantContext.ts  # Tenant isolation and RBAC
+│   │   └── errorHandler.ts  # Error handling and responses
+│   ├── repositories/        # Data access layer (tenant-scoped)
+│   │   ├── BaseRepository.ts
+│   │   ├── OrganizationRepository.ts
+│   │   ├── UserRepository.ts
+│   │   ├── OrganizationMemberRepository.ts
+│   │   ├── AvailabilityRepository.ts
+│   │   ├── AppointmentRepository.ts
+│   │   ├── NotificationRepository.ts
+│   │   ├── OAuthAccountRepository.ts
+│   │   ├── SessionRepository.ts
+│   │   └── TimeBlockRepository.ts
+│   ├── services/            # Business logic
+│   │   ├── SchedulingService.ts
+│   │   ├── AppointmentService.ts
+│   │   ├── NotificationService.ts
+│   │   ├── SessionService.ts
+│   │   └── GoogleMailboxService.ts
+│   ├── routes/              # API route handlers
+│   │   ├── auth.routes.ts
+│   │   ├── organizations.routes.ts
+│   │   ├── users.routes.ts
+│   │   ├── availability.routes.ts
+│   │   ├── appointments.routes.ts
+│   │   ├── booking-links.routes.ts
+│   │   └── public-booking.routes.ts
+│   ├── types/               # TypeScript types
+│   │   └── index.ts
+│   ├── utils/               # Shared helpers (permissions, etc.)
+│   ├── workers/             # Bull queue workers (email, SMS)
+│   └── tests/               # Vitest test suites
 ├── docs/                    # Documentation
 │   ├── ARCHITECTURE.md      # Architecture documentation
 │   ├── Phase.RoadMap.md     # 12-phase roadmap
-│   └── decision-log/        # Architecture decisions (ADRs)
+│   ├── decision-log/        # Architecture decisions (ADRs)
+│   └── todo/                # Phase-level TODO tracking
+├── scripts/                 # Dev and ops scripts
+│   ├── dev/                 # Quality gates, seeding, log reading
+│   └── ops/                 # Ubuntu service templates
 ├── .github/                 # GitHub configuration
 │   └── instructions/        # Project governance and guidelines
 ├── .claude/                 # AI assistant customizations
-│   └── rules/              # Code, SQL, documentation rules
+│   └── rules/               # Code, SQL, documentation rules
 ├── logs/                    # Execution logs
-│   └── copilot/            # AI assistant logs
+│   └── copilot/             # AI assistant logs
 ├── package.json             # Dependencies
 ├── tsconfig.json            # TypeScript configuration
 ├── .env.example             # Environment variables template
-└── .gitignore              # Git ignore rules
+└── .gitignore               # Git ignore rules
 ```
 
 ## Development Workflow

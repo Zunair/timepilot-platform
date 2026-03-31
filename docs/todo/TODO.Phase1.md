@@ -14,7 +14,7 @@
 - Verification: /.github/instructions/verification.md
 - Gate: /.github/instructions/phase-gates.md
 - Architecture: /docs/ARCHITECTURE.md
-- Implementation Status: /docs/IMPLEMENTATION_STATUS.md
+- Architecture: /docs/ARCHITECTURE.md
 
 ## Core Architecture
 - [x] COMPLETED Implement multi-tenant architecture with strict tenant isolation

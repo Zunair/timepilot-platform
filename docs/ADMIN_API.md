@@ -4,6 +4,15 @@
 
 The Admin & Settings API provides endpoints for organization and user management, allowing admins to configure their workspace, manage team members, and control availability rules.
 
+### Key Implementation Files
+
+| File | Purpose |
+|------|---------|
+| `src/utils/permissions.ts` | Permission enum (13 permissions) and role-mapping helpers |
+| `src/routes/organizations.routes.ts` | Admin dashboard, settings, and team endpoints |
+| `src/routes/users.routes.ts` | User profile endpoints |
+| `src/tests/admin.test.ts` | Permission system tests |
+
 ## Authentication
 
 All admin endpoints require an authenticated session with valid tenant context. Session credentials must be included in request headers.

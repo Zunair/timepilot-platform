@@ -20,7 +20,7 @@ Enterprise-grade, multi-tenant scheduling platform for secure, scalable appointm
 
 Completed: multi-tenant architecture, OAuth SSO (Google/Apple/Microsoft), session management, scheduling engine with timezone-safe slot generation, booking UI with calendar, availability & time-block management, async email/SMS notifications, admin dashboard, team management, and role-based access control.
 
-See [docs/IMPLEMENTATION_STATUS.md](docs/IMPLEMENTATION_STATUS.md) for details and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
 
 ## Quick Start
 
@@ -126,9 +126,12 @@ src/
 └── tests/             # Vitest test suites
 
 docs/
-├── ARCHITECTURE.md           # System design
-├── IMPLEMENTATION_STATUS.md  # Progress tracking
+├── ARCHITECTURE.md           # System design and architecture layers
+├── ADMIN_API.md              # Admin endpoint reference and RBAC matrix
+├── AVAILABILITY_SETTINGS.md  # Availability feature docs
 ├── Phase.RoadMap.md          # 12-phase delivery roadmap
+├── DEPLOYMENT.md             # SSH setup and deployment bootstrap
+├── ADMIN_SETUP_UBUNTU.md     # systemd service installation
 ├── decision-log/             # Architecture decisions (ADRs)
 └── todo/                     # Phase-level TODO tracking
 ```
