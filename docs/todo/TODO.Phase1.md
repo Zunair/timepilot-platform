@@ -5,15 +5,38 @@
     - [x] COMPLETED Integrate booking links section into admin settings panel (src/client.ts)
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
+
+> **Progress: 156 / 172 items complete (91%)**
+> Last updated: 2026-03-30
+
+### Remaining work (16 items)
+| Status | Item |
+|--------|------|
+| IN-PROGRESS | OAuth social login (parent — sub-items done, needs final gate) |
+| NOT-STARTED | Dead-letter queue for failed notifications |
+| IN-PROGRESS | Google mailbox sending (provider integration) |
+| NOT-STARTED | End-to-end worker tests for Google mailbox delivery |
+| IN-PROGRESS | Admin landing and zero-org onboarding flow (polish) |
+| NOT-STARTED | Notification queue worker integration test |
+| IN-PROGRESS | Integration tests (additional coverage) |
+| NOT-STARTED | Full booking flow E2E test |
+| NOT-STARTED | Timezone handling system-wide test |
+| NOT-STARTED | Reminders during DST transitions test |
+| IN-PROGRESS | Ubuntu admin setup runbook (polish) |
+| NOT-STARTED | Validate installer E2E on clean Ubuntu host |
+| NOT-STARTED | API documentation |
+| NOT-STARTED | Booking flow client documentation |
+| NOT-STARTED | Admin setup guide |
+| NOT-STARTED | Timezone handling approach documentation |
+
 ## Phase Status
 - State: IN-PROGRESS
-- Last Updated: 2026-03-29
+- Last Updated: 2026-03-30
 - Owner: Tech Lead
 - Active Blockers: None
 - Approval: Tech Lead
 - Verification: /.github/instructions/verification.md
 - Gate: /.github/instructions/phase-gates.md
-- Architecture: /docs/ARCHITECTURE.md
 - Architecture: /docs/ARCHITECTURE.md
 
 ## Core Architecture

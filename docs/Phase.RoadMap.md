@@ -3,13 +3,29 @@
 ## Overview
 This roadmap outlines 12 phases to build an enterprise-grade multi-tenant scheduling platform. Detailed task breakdowns and tracking are maintained in `/docs/todo/TODO.Phase#.md` files.
 
+### Progress at a Glance
+| Phase | Name | Status |
+|-------|------|--------|
+| 1 | Foundation & Core Booking | **91% complete** — 156/172 items done |
+| 2 | Contract Management & Invoicing | Not started |
+| 3 | AI Integration | Not started |
+| 4 | Payment Processing | Not started |
+| 5 | Advanced Security & Compliance | Not started |
+| 6 | Analytics, Reporting & Insights | Not started |
+| 7 | API & Integrations | Not started |
+| 8 | Team Collaboration & CRM | Not started |
+| 9 | Advanced Workflows & Automation | Not started |
+| 10 | Enterprise Admin & Operations | Not started |
+| 11 | Mobile & Native Apps | Not started |
+| 12 | AI & Predictive Features | Not started |
+
 Governance policy: `/.github/instructions/GOVERNANCE.md`
 Phase gates: `/.github/instructions/phase-gates.md`
 Verification checklist: `/.github/instructions/verification.md`
 Quality and logs workflow: `/.github/instructions/quality-and-logs.md`
 Decision log: `/docs/decision-log/`
 
-## Phase 1 (MVP) - Foundation & Core Booking
+## Phase 1 (MVP) - Foundation & Core Booking — 91% Complete
 - Multi-tenant architecture with strict tenant isolation
 - Multi-user org model with roles: Owner, Admin, Member, Viewer
 - Social login for user account access: Google, Apple, Microsoft (OAuth/OIDC)
@@ -25,7 +41,7 @@ Decision log: `/docs/decision-log/`
 
 Detailed Tasks: See [/docs/todo/TODO.Phase1.md](/docs/todo/TODO.Phase1.md)
 
-## Phase 2 - Contract Management & Invoicing
+## Phase 2 - Contract Management & Invoicing — Not Started
 - Contract management system with templates and versioning
 - Contract editor UI with rich-text and variable support
 - Signature capture from phone for clients
@@ -36,7 +52,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase1.md](/docs/todo/TODO.Phase1.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase2.md](/docs/todo/TODO.Phase2.md)
 
-## Phase 3 - AI Integration
+## Phase 3 - AI Integration — Not Started
 - OpenAI integration setup with rate limiting and cost tracking
 - AI contract writing and proofreading assistance
 - Human-in-the-loop approval system for AI suggestions
@@ -45,7 +61,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase2.md](/docs/todo/TODO.Phase2.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase3.md](/docs/todo/TODO.Phase3.md)
 
-## Phase 4 - Payment Processing
+## Phase 4 - Payment Processing — Not Started
 - Integration with Stripe, PayPal, ACH, and credit cards
 - Per-tenant payment configuration and secure credential storage
 - Secure payment processing with idempotency
@@ -56,7 +72,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase3.md](/docs/todo/TODO.Phase3.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase4.md](/docs/todo/TODO.Phase4.md)
 
-## Phase 5 - Advanced Security & Compliance
+## Phase 5 - Advanced Security & Compliance — Not Started
 - Two-factor authentication (email/SMS/authenticator app)
 - Single Sign-On (SAML 2.0, enterprise SSO)
 - Comprehensive audit logging with immutable event records
@@ -66,7 +82,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase4.md](/docs/todo/TODO.Phase4.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase5.md](/docs/todo/TODO.Phase5.md)
 
-## Phase 6 - Analytics, Reporting & Insights
+## Phase 6 - Analytics, Reporting & Insights — Not Started
 - Real-time booking analytics dashboard
 - Revenue and payment reporting
 - Staff utilization and performance metrics
@@ -77,7 +93,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase5.md](/docs/todo/TODO.Phase5.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase6.md](/docs/todo/TODO.Phase6.md)
 
-## Phase 7 - API & Integrations
+## Phase 7 - API & Integrations — Not Started
 - RESTful API with full CRUD operations and OpenAPI spec
 - OAuth 2.0 server for third-party app authorization
 - Webhook infrastructure with retry logic and signing
@@ -90,7 +106,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase6.md](/docs/todo/TODO.Phase6.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase7.md](/docs/todo/TODO.Phase7.md)
 
-## Phase 8 - Team Collaboration & CRM
+## Phase 8 - Team Collaboration & CRM — Not Started
 - Team messaging system with real-time delivery
 - Booking notes and comments with threading
 - CRM foundation with rich client profiles
@@ -101,7 +117,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase7.md](/docs/todo/TODO.Phase7.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase8.md](/docs/todo/TODO.Phase8.md)
 
-## Phase 9 - Advanced Workflows & Automation
+## Phase 9 - Advanced Workflows & Automation — Not Started
 - Custom booking workflow builder with drag-and-drop UI
 - Workflow triggers and conditional logic
 - Automated rules engine for availability and pricing
@@ -111,7 +127,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase8.md](/docs/todo/TODO.Phase8.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase9.md](/docs/todo/TODO.Phase9.md)
 
-## Phase 10 - Enterprise Admin & Operations
+## Phase 10 - Enterprise Admin & Operations — Not Started
 - White-label capabilities with custom domains and branding
 - Multi-organization hierarchy support
 - Centralized billing and invoice management
@@ -122,7 +138,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase9.md](/docs/todo/TODO.Phase9.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase10.md](/docs/todo/TODO.Phase10.md)
 
-## Phase 11 - Mobile & Native Apps
+## Phase 11 - Mobile & Native Apps — Not Started
 - iOS native app with push notifications and biometric auth
 - Android native app with push notifications and biometric auth
 - Offline mode with data sync
@@ -131,7 +147,7 @@ Detailed Tasks: See [/docs/todo/TODO.Phase10.md](/docs/todo/TODO.Phase10.md)
 
 Detailed Tasks: See [/docs/todo/TODO.Phase11.md](/docs/todo/TODO.Phase11.md)
 
-## Phase 12 - AI & Predictive Features
+## Phase 12 - AI & Predictive Features — Not Started
 - AI-powered scheduling recommendations
 - Predictive analytics for no-shows and cancellations
 - Automated confirmations and reminders with NLP

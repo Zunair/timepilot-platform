@@ -16,11 +16,13 @@ Enterprise-grade, multi-tenant scheduling platform for secure, scalable appointm
 
 ## Current Status
 
-**Phase 1 (MVP) — In Progress**
+**Phase 1 (MVP) — 91% Complete** (156 of 172 items done)
 
 Completed: multi-tenant architecture, OAuth SSO (Google/Apple/Microsoft), session management, scheduling engine with timezone-safe slot generation, booking UI with calendar, availability & time-block management, async email/SMS notifications, admin dashboard, team management, and role-based access control.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
+Remaining: dead-letter queue, E2E tests, Google mailbox finalization, API docs.
+
+See [CHANGELOG.md](CHANGELOG.md) for release history, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details, and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
 
 ## Quick Start
 
