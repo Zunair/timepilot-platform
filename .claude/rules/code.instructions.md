@@ -21,17 +21,16 @@ paths:
 Use **future tense** to describe what the commit adds or changes. Follow this format:
 
 ```
-feature([section]): Adds [feature description]
-* Brief detail 1
-* Brief detail 2
-* Brief detail 3
+git commit -m "feature([section]): Adds [feature description]"
 ```
 
+**CRITICAL:** Always use a single-line `git commit -m "..."` command. Never use multi-line commit messages in the terminal — PowerShell mishandles multi-line strings and the commit will hang or fail. Keep the subject line concise (under 120 chars). If more detail is needed, add it in the PR description, not the commit message.
+
 **Examples:**
-- `feature(auth): Adds OAuth 2.0 integration for Google Sign-In`
-- `feature(booking): Adds calendar UI with year, date, time selection`
-- `fix(notifications): Fixes email delivery retry logic with exponential backoff`
-- `refactor(db): Refactors tenant isolation queries for improved performance`
+- `git commit -m "feature(auth): Adds OAuth 2.0 integration for Google Sign-In"`
+- `git commit -m "feature(booking): Adds calendar UI with year, date, time selection"`
+- `git commit -m "fix(notifications): Fixes email delivery retry logic with exponential backoff"`
+- `git commit -m "refactor(db): Refactors tenant isolation queries for improved performance"`
 
 **Commit Type Keywords:**
 - `feature([section]):` - New functionality
