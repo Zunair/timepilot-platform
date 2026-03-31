@@ -23,6 +23,8 @@ export class OrganizationRepository extends BaseRepository<Organization> {
     'logo_url',
     'primary_color',
     'secondary_color',
+    'background_color',
+    'foreground_color',
     'font_family',
     'logo_uploaded_at',
     'created_at',
@@ -129,6 +131,14 @@ export class OrganizationRepository extends BaseRepository<Organization> {
       updates.push(`secondary_color = $${paramIndex++}`);
       values.push(data.secondaryColor);
     }
+    if (data.backgroundColor !== undefined) {
+      updates.push(`background_color = $${paramIndex++}`);
+      values.push(data.backgroundColor || null);
+    }
+    if (data.foregroundColor !== undefined) {
+      updates.push(`foreground_color = $${paramIndex++}`);
+      values.push(data.foregroundColor || null);
+    }
     if (data.fontFamily) {
       updates.push(`font_family = $${paramIndex++}`);
       values.push(data.fontFamily);
@@ -160,6 +170,8 @@ export class OrganizationRepository extends BaseRepository<Organization> {
       logoUrl: row.logo_url as string | undefined,
       primaryColor: row.primary_color as string | undefined,
       secondaryColor: row.secondary_color as string | undefined,
+      backgroundColor: row.background_color as string | undefined,
+      foregroundColor: row.foreground_color as string | undefined,
       fontFamily: row.font_family as string | undefined,
       logoUploadedAt: row.logo_uploaded_at as string | undefined,
       createdAt: row.created_at as string,

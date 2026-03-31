@@ -56,8 +56,10 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       --accent:      #0f766e;
       --accent-lite: #d1faf3;
       --accent-hov:  #0d9488;
+      --accent-glow: rgba(15,118,110,0.12);
       --border:      #e0dbd5;
       --error:       #dc2626;
+      --font:        Georgia, 'Times New Roman', serif;
       --radius:      16px;
       --shadow:      0 8px 40px rgba(15,118,110,0.10);
     }
@@ -67,13 +69,13 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     body {
       margin: 0;
       min-height: 100vh;
-      background:
-        radial-gradient(circle at top left, rgba(15,118,110,0.12), transparent 32%),
-        linear-gradient(160deg, #faf7f2, var(--bg));
-      font-family: Georgia, 'Times New Roman', serif;
+      background: var(--bg);
+      font-family: var(--font);
       color: var(--text);
       padding: 32px 16px 64px;
     }
+
+    input, select, textarea, code, pre, button { color: inherit; }
 
     /* ─── Layout ──────────────────────────────────────────────────── */
     .page { max-width: 680px; margin: 0 auto; }
@@ -95,7 +97,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       display: inline-block;
       padding: 3px 10px;
       border-radius: 99px;
-      background: var(--accent-lite);
+      background: color-mix(in srgb, var(--accent) 10%, var(--panel));
       color: var(--accent);
       font-size: 0.72rem;
       font-family: 'Helvetica Neue', Arial, sans-serif;
@@ -110,7 +112,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       padding: 11px 24px;
       background: var(--accent);
-      color: #fff;
+      color: var(--panel);
       border: none;
       border-radius: 10px;
       font-size: 0.95rem;
@@ -127,7 +129,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       color: var(--accent);
       border: 1px solid var(--border);
     }
-    .btn-ghost:hover { background: var(--accent-lite); border-color: var(--accent); }
+    .btn-ghost:hover { background: color-mix(in srgb, var(--accent) 8%, var(--panel)); border-color: var(--accent); }
 
     /* ─── Loading ─────────────────────────────────────────────────── */
     .spinner-wrap { display: flex; justify-content: center; padding: 48px 0; }
@@ -153,7 +155,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       border-radius: 14px;
       background: var(--accent);
       display: flex; align-items: center; justify-content: center;
-      color: #fff; font-size: 1.4rem; font-weight: 700;
+      color: var(--panel); font-size: 1.4rem; font-weight: 700;
       flex-shrink: 0; overflow: hidden;
     }
     .org-avatar img { width: 100%; height: 100%; object-fit: cover; }
@@ -174,7 +176,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       display: flex; align-items: center; justify-content: center;
       transition: border-color 0.15s, background 0.15s;
     }
-    .cal-nav-btn:hover { border-color: var(--accent); background: var(--accent-lite); }
+    .cal-nav-btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
     .cal-month-label { font-weight: 600; font-size: 1rem; }
     .cal-tz { font-size: 0.75rem; color: var(--muted); margin-bottom: 12px; }
 
@@ -204,7 +206,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       user-select: none;
     }
     .cal-cell:hover:not(.past):not(.empty) {
-      background: var(--accent-lite);
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel));
       border-color: var(--accent);
       color: var(--accent);
     }
@@ -215,7 +217,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       color: var(--border);
     }
     .cal-cell.today  { font-weight: 700; border-color: var(--accent); color: var(--accent); }
-    .cal-cell.sel    { background: var(--accent); color: #fff; border-color: var(--accent); font-weight: 700; }
+    .cal-cell.sel    { background: var(--accent); color: var(--panel); border-color: var(--accent); font-weight: 700; }
     .cal-cell.past   { color: var(--border); cursor: default; }
     .cal-cell.unavailable,
     .cal-cell.loading { color: var(--border); cursor: default; }
@@ -235,13 +237,13 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       border-radius: 10px;
       background: var(--panel);
       font-size: 0.88rem;
-      font-family: Georgia, serif;
+      font-family: var(--font);
       cursor: pointer;
       text-align: center;
       transition: border-color 0.12s, background 0.12s, color 0.12s;
       color: var(--text);
     }
-    .slot-btn:hover { border-color: var(--accent); background: var(--accent-lite); color: var(--accent); }
+    .slot-btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); color: var(--accent); }
     .no-slots { text-align: center; padding: 24px; color: var(--muted); font-size: 0.9rem; }
 
     /* ─── Form ────────────────────────────────────────────────────── */
@@ -254,7 +256,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     .back-link:hover { text-decoration: underline; }
 
     .slot-summary {
-      background: var(--accent-lite);
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel));
       border-radius: 10px;
       padding: 14px 18px;
       margin-bottom: 24px;
@@ -277,7 +279,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       width: 100%; padding: 10px 14px;
       border: 1px solid var(--border); border-radius: 8px;
       font-size: 0.95rem; font-family: Georgia, serif;
-      background: #fff; color: var(--text);
+      background: var(--panel); color: var(--text);
       transition: border-color 0.15s;
     }
     .form-group input:focus, .form-group textarea:focus { outline: none; border-color: var(--accent); }
@@ -292,8 +294,8 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     .alert-error {
       padding: 12px 16px;
       border-radius: 8px;
-      background: #fef2f2;
-      border: 1px solid #fecaca;
+      background: color-mix(in srgb, var(--error) 8%, var(--panel));
+      border: 1px solid color-mix(in srgb, var(--error) 25%, var(--panel));
       color: var(--error);
       font-size: 0.88rem;
       margin-bottom: 16px;
@@ -303,15 +305,15 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     .confirmed-body { text-align: center; }
     .confirmed-icon {
       width: 64px; height: 64px;
-      background: #dcfce7; border-radius: 50%;
+      background: color-mix(in srgb, var(--accent) 10%, var(--panel)); border-radius: 50%;
       display: flex; align-items: center; justify-content: center;
-      font-size: 2rem; margin: 0 auto 24px;
+      font-size: 2rem; margin: 0 auto 24px; color: var(--accent);
     }
     .confirmed-body h1 { margin-bottom: 8px; }
     .confirmed-body > p { color: var(--muted); margin-bottom: 24px; }
 
     .booking-detail {
-      background: var(--accent-lite);
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel));
       border-radius: 12px;
       padding: 20px 24px;
       text-align: left;
@@ -319,7 +321,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     }
     .booking-detail-row {
       display: flex; justify-content: space-between; gap: 8px;
-      padding: 8px 0; border-bottom: 1px solid #b2f0e0;
+      padding: 8px 0; border-bottom: 1px solid var(--border);
     }
     .booking-detail-row:last-child { border-bottom: none; }
     .bd-key { font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-family: Arial, sans-serif; }
@@ -336,7 +338,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
 
     /* ─── Center Card (welcome / error) ──────────────────────────── */
     .center-card { text-align: center; padding: 48px 32px; }
-    .center-card .icon { font-size: 3rem; margin-bottom: 16px; }
+    .center-card .icon { font-size: 3rem; margin-bottom: 16px; color: var(--text); }
 
     .sso-section { margin-top: 24px; }
     .sso-title {
@@ -357,27 +359,27 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       border: 1px solid var(--border);
       border-radius: 10px;
       color: var(--text);
-      background: #fff;
+      background: var(--panel);
       text-decoration: none;
       transition: border-color 0.15s, background 0.15s;
       font-size: 0.92rem;
     }
-    .sso-btn:hover { border-color: var(--accent); background: var(--accent-lite); }
+    .sso-btn:hover { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); }
     .email-banner {
       display: flex;
       justify-content: space-between;
       gap: 12px;
       align-items: center;
-      border: 1px solid #f5d0a7;
-      background: #fff7ed;
-      color: #9a3412;
+      border: 1px solid var(--border);
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel));
+      color: var(--text);
       border-radius: 10px;
       padding: 10px 12px;
       margin-bottom: 16px;
       font-size: 0.88rem;
     }
     .email-banner a {
-      color: #9a3412;
+      color: var(--accent);
       font-weight: 700;
       white-space: nowrap;
     }
@@ -390,7 +392,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       width: 100%;
       text-align: left;
       border: 1px solid var(--border);
-      background: #fff;
+      background: var(--panel);
       color: var(--text);
       border-radius: 10px;
       padding: 12px 14px;
@@ -399,7 +401,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     }
     .org-select-btn:hover {
       border-color: var(--accent);
-      background: var(--accent-lite);
+      background: color-mix(in srgb, var(--accent) 8%, var(--panel));
     }
     .org-select-name {
       font-size: 0.98rem;
@@ -684,6 +686,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       apiFetch('/api/organizations/slug/' + encodeURIComponent(slug))
         .then(function(org) {
           S.org = org;
+          applyTheme(org);
           ensureInitialAvailability();
         })
         .catch(function()   { S.error = 'Booking page not found. Please check the link.'; S.step = 'error'; render(); });
@@ -1048,6 +1051,63 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       }).catch(function() {});
     }
 
+    // ─── Theme ───────────────────────────────────────────────────────
+    /**
+     * Apply organization branding to CSS custom properties.
+     * Derives hover and glow variants automatically from the primary color.
+     */
+    function applyTheme(org) {
+      if (!org) return;
+      var root = document.documentElement.style;
+
+      if (org.primaryColor) {
+        root.setProperty('--accent', org.primaryColor);
+        // Derive hover: darken primary by mixing toward black
+        var r = parseInt(org.primaryColor.slice(1, 3), 16);
+        var g = parseInt(org.primaryColor.slice(3, 5), 16);
+        var b = parseInt(org.primaryColor.slice(5, 7), 16);
+        var dr = Math.round(r * 0.85);
+        var dg = Math.round(g * 0.85);
+        var db = Math.round(b * 0.85);
+        root.setProperty('--accent-hov', '#' + ((1 << 24) + (dr << 16) + (dg << 8) + db).toString(16).slice(1));
+        root.setProperty('--accent-glow', 'rgba(' + r + ',' + g + ',' + b + ',0.12)');
+        root.setProperty('--shadow', '0 8px 40px rgba(' + r + ',' + g + ',' + b + ',0.10)');
+      }
+
+      if (org.secondaryColor) {
+        root.setProperty('--accent-lite', org.secondaryColor);
+      }
+
+      if (org.backgroundColor) {
+        root.setProperty('--bg', org.backgroundColor);
+        root.setProperty('--panel', org.backgroundColor);
+      }
+
+      if (org.foregroundColor) {
+        root.setProperty('--text', org.foregroundColor);
+        // Derive muted: same hue but lighter
+        var fr = parseInt(org.foregroundColor.slice(1, 3), 16);
+        var fg = parseInt(org.foregroundColor.slice(3, 5), 16);
+        var fb = parseInt(org.foregroundColor.slice(5, 7), 16);
+        var mr = Math.min(255, Math.round(fr + (255 - fr) * 0.45));
+        var mg = Math.min(255, Math.round(fg + (255 - fg) * 0.45));
+        var mb = Math.min(255, Math.round(fb + (255 - fb) * 0.45));
+        root.setProperty('--muted', '#' + ((1 << 24) + (mr << 16) + (mg << 8) + mb).toString(16).slice(1));
+      }
+
+      if (org.fontFamily) {
+        root.setProperty('--font', org.fontFamily);
+      }
+    }
+
+    function resetTheme() {
+      var root = document.documentElement.style;
+      var props = ['--accent', '--accent-hov', '--accent-glow', '--accent-lite', '--shadow', '--font', '--bg', '--panel', '--text', '--muted'];
+      for (var i = 0; i < props.length; i++) {
+        root.removeProperty(props[i]);
+      }
+    }
+
     // ─── Render ──────────────────────────────────────────────────────
     function render() {
       var app = document.getElementById('app');
@@ -1210,9 +1270,19 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<input id="settings-org-secondary" name="secondaryColor" type="color" value="' + esc(org.secondaryColor || '#d1faf3') + '" style="height:44px;cursor:pointer" />'
         + '</div>'
         + '</div>'
+        + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
+        + '<div class="form-group">'
+        + '<label for="settings-org-bg">Background color</label>'
+        + '<input id="settings-org-bg" name="backgroundColor" type="color" value="' + esc(org.backgroundColor || '#f3efe7') + '" style="height:44px;cursor:pointer" />'
+        + '</div>'
+        + '<div class="form-group">'
+        + '<label for="settings-org-fg">Text color</label>'
+        + '<input id="settings-org-fg" name="foregroundColor" type="color" value="' + esc(org.foregroundColor || '#1f2937') + '" style="height:44px;cursor:pointer" />'
+        + '</div>'
+        + '</div>'
         + '<div class="form-group">'
         + '<label for="settings-org-font">Font family</label>'
-        + '<select id="settings-org-font" name="fontFamily" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;background:white">'
+        + '<select id="settings-org-font" name="fontFamily" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:0.95rem;background:var(--panel)">'
         + ['Georgia, serif', 'Arial, sans-serif', '"Helvetica Neue", sans-serif', '"Times New Roman", serif', 'Verdana, sans-serif'].map(function(f) {
             var val = f.split(',')[0].replace(/"/g,'');
             var sel = (org.fontFamily && org.fontFamily.split(',')[0].trim() === val) ? ' selected' : '';
@@ -1222,9 +1292,13 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '</div>'
         + (S.settingsError ? '<div class="alert-error">' + esc(S.settingsError) + '</div>' : '')
         + (S.settingsMessage ? '<p style="color:var(--accent);font-weight:600">' + esc(S.settingsMessage) + '</p>' : '')
+        + '<div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">'
         + '<button class="btn" type="submit"' + (S.settingsSaving ? ' disabled' : '') + '>'
         + (S.settingsSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save branding')
         + '</button>'
+        + '<button type="button" class="btn btn-ghost" id="theme-preset-light" style="padding:8px 14px;font-size:0.85rem">&#9728; Light</button>'
+        + '<button type="button" class="btn btn-ghost" id="theme-preset-dark" style="padding:8px 14px;font-size:0.85rem">&#9790; Dark</button>'
+        + '</div>'
         + '</form>'
         // User Profile
         + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
@@ -1273,12 +1347,12 @@ export const BOOKING_HTML = `<!DOCTYPE html>
                 + '<div style="flex:1;min-width:0">'
                 + (lnk.label ? '<p style="margin:0 0 4px;font-weight:600;font-size:0.9rem">' + esc(lnk.label) + '</p>' : '')
                 + '<p style="margin:0 0 2px;font-size:0.8rem;color:var(--muted)">' + esc(lnk.userName) + '</p>'
-                + '<code style="display:block;background:var(--accent-lite);padding:6px 8px;border-radius:6px;font-size:0.78rem;word-break:break-all;margin:6px 0">' + esc(lnk.bookingUrl) + '</code>'
+                + '<code style="display:block;background:color-mix(in srgb, var(--accent) 8%, var(--panel));padding:6px 8px;border-radius:6px;font-size:0.78rem;word-break:break-all;margin:6px 0">' + esc(lnk.bookingUrl) + '</code>'
                 + '</div>'
                 + '<div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0">'
                 + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem" data-copy-link="' + esc(lnk.bookingUrl) + '">Copy</button>'
                 + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem" data-toggle-qr="' + esc(lnk.token) + '">QR</button>'
-                + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem;color:#dc2626" data-delete-link-id="' + esc(lnk.id) + '">Delete</button>'
+                + '<button class="btn btn-ghost" style="padding:6px 10px;font-size:0.8rem;color:var(--error)" data-delete-link-id="' + esc(lnk.id) + '">Delete</button>'
                 + '</div>'
                 + '</div>'
                 + '<div id="qr-' + esc(lnk.token) + '" style="display:none;margin-top:10px;text-align:center">'
@@ -1296,11 +1370,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Set your available hours. Use <strong>Recurring</strong> for regular weekly hours, or <strong>One-time</strong> for a specific date.</p>'
         + (S.availabilityError ? '<div class="alert-error">' + esc(S.availabilityError) + '</div>' : '')
         + (S.availabilityMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.availabilityMessage) + '</p>' : '')
-        + '<form id="availability-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        + '<form id="availability-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--panel);box-shadow:var(--shadow)">' 
         + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Add availability</h4>'
-        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
-        + '<button type="button" data-avail-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (isRecurring ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
-        + '<button type="button" data-avail-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (!isRecurring ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
+        + '<div style="display:flex;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
+        + '<button type="button" data-avail-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (isRecurring ? 'background:var(--accent);color:var(--panel)' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
+        + '<button type="button" data-avail-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (!isRecurring ? 'background:var(--accent);color:var(--panel)' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
         + '</div>'
         + (isRecurring
           ? '<div class="form-group">'
@@ -1316,7 +1390,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             { val: 0, label: 'Sun' }
           ].map(function(d) {
             var checked = (S.newAvailabilityDaysOfWeek || []).indexOf(d.val) >= 0;
-            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? 'var(--accent)' : 'white') + ';color:' + (checked ? 'white' : 'inherit') + '">'
+            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? 'var(--accent)' : 'var(--panel)') + ';color:' + (checked ? 'var(--panel)' : 'inherit') + '">'
               + '<input type="checkbox" name="dayOfWeek" value="' + d.val + '"' + (checked ? ' checked' : '') + ' style="display:none" />'
               + esc(d.label)
               + '</label>';
@@ -1326,31 +1400,31 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
           + '<div class="form-group">'
           + '<label for="avail-from-date">Active from</label>'
-          + '<input id="avail-from-date" name="fromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availFromDate) + '" />'
+          + '<input id="avail-from-date" name="fromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(availFromDate) + '" />'
           + '</div>'
           + '<div class="form-group">'
           + '<label for="avail-until-date">Until <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
-          + '<input id="avail-until-date" name="untilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availUntilDate) + '" />'
+          + '<input id="avail-until-date" name="untilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(availUntilDate) + '" />'
           + '</div>'
           + '</div>'
           : '<div class="form-group">'
           + '<label for="avail-date">Date</label>'
-          + '<input id="avail-date" name="date" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(availFromDate) + '" />'
+          + '<input id="avail-date" name="date" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(availFromDate) + '" />'
           + '</div>'
         )
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
         + '<div class="form-group">'
         + '<label for="avail-start">Start time</label>'
-        + '<input id="avail-start" name="startTime" type="time" value="' + esc(S.newAvailabilityStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="avail-start" name="startTime" type="time" value="' + esc(S.newAvailabilityStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
         + '<div class="form-group">'
         + '<label for="avail-end">End time</label>'
-        + '<input id="avail-end" name="endTime" type="time" value="' + esc(S.newAvailabilityEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="avail-end" name="endTime" type="time" value="' + esc(S.newAvailabilityEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
         + '</div>'
         + '<div class="form-group">'
         + '<label for="avail-buffer">Buffer between appointments <span style="font-weight:400;color:var(--muted)">(minutes)</span></label>'
-        + '<input id="avail-buffer" name="bufferMinutes" type="number" min="0" max="480" value="' + (S.newAvailabilityBufferMinutes || 0) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="avail-buffer" name="bufferMinutes" type="number" min="0" max="480" value="' + (S.newAvailabilityBufferMinutes || 0) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
         + '<button class="btn" type="submit"' + (S.newAvailabilitySaving ? ' disabled' : '') + '>'
         + (S.newAvailabilitySaving ? '<span class="spinner spinner-sm"></span> Adding…' : '+ Add availability')
@@ -1362,11 +1436,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             ? '<p style="color:var(--muted);font-size:0.9rem">No availability rules yet. Add one above to enable bookings.</p>'
             : '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
             + '<table style="width:100%;border-collapse:collapse;font-size:0.9rem">'
-            + '<thead style="background:var(--accent-lite);border-bottom:1px solid var(--border)">'
+            + '<thead style="background:var(--panel);border-bottom:1px solid var(--border)">'
             + '<tr>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Type</th>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Schedule</th>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Action</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Type</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Schedule</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Action</th>'
             + '</tr>'
             + '</thead>'
             + '<tbody>'
@@ -1388,10 +1462,10 @@ export const BOOKING_HTML = `<!DOCTYPE html>
                 : (dateLabel + ' | ' + timeStr + ' (' + tz + ')');
               var typeLabel = avail.type === 'week' ? 'Recurring' : avail.type === 'day' ? 'One-time' : avail.type.toUpperCase();
               return '<tr style="border-bottom:1px solid var(--border)">'
-                + '<td style="padding:12px 16px"><span style="background:var(--accent-lite);padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
+                + '<td style="padding:12px 16px"><span style="background:color-mix(in srgb, var(--accent) 8%, var(--panel));color:var(--accent);padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
                 + '<td style="padding:12px 16px"><code style="font-size:0.85rem">' + esc(scheduleText) + '</code></td>'
                 + '<td style="padding:12px 16px">'
-                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-delete-avail-id="' + esc(avail.id) + '">Delete</button>'
+                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:var(--error)" data-delete-avail-id="' + esc(avail.id) + '">Delete</button>'
                 + '</td>'
                 + '</tr>';
             }).join('')
@@ -1406,15 +1480,15 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Block out specific hours when you\\'re unavailable. Blocked time is excluded from your available booking slots.</p>'
         + (S.timeBlockError ? '<div class="alert-error">' + esc(S.timeBlockError) + '</div>' : '')
         + (S.timeBlockMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.timeBlockMessage) + '</p>' : '')
-        + '<form id="time-block-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        + '<form id="time-block-form" style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--panel);box-shadow:var(--shadow)">' 
         + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Add blocked time</h4>'
         + '<div class="form-group">'
         + '<label for="block-title">Reason <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
-        + '<input id="block-title" name="blockTitle" type="text" placeholder="e.g. Lunch break, Team meeting, Vacation" value="' + esc(S.newTimeBlockTitle || '') + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="block-title" name="blockTitle" type="text" placeholder="e.g. Lunch break, Team meeting, Vacation" value="' + esc(S.newTimeBlockTitle || '') + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
-        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
-        + '<button type="button" data-block-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode !== 'recurring' ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
-        + '<button type="button" data-block-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode === 'recurring' ? 'background:var(--accent);color:white' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
+        + '<div style="display:flex;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px;margin-bottom:20px">'
+        + '<button type="button" data-block-mode="one-time" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode !== 'recurring' ? 'background:var(--accent);color:var(--panel)' : 'background:transparent;color:var(--muted)') + '">&#x1F4C5; One-time</button>'
+        + '<button type="button" data-block-mode="recurring" style="flex:1;padding:8px 12px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;' + (S.newTimeBlockMode === 'recurring' ? 'background:var(--accent);color:var(--panel)' : 'background:transparent;color:var(--muted)') + '">&#x21BB; Recurring</button>'
         + '</div>'
         + (S.newTimeBlockMode === 'recurring'
           ? '<div class="form-group">'
@@ -1430,7 +1504,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             { val: 0, label: 'Sun' }
           ].map(function(d) {
             var checked = (S.newTimeBlockDaysOfWeek || []).indexOf(d.val) >= 0;
-            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? '#dc2626' : 'white') + ';color:' + (checked ? 'white' : 'inherit') + '">'
+            return '<label style="display:flex;align-items:center;cursor:pointer;padding:6px 12px;border:1px solid var(--border);border-radius:6px;font-size:0.85rem;font-weight:600;background:' + (checked ? 'var(--error)' : 'var(--panel)') + ';color:' + (checked ? 'var(--panel)' : 'inherit') + '">'
               + '<input type="checkbox" name="blockDayOfWeek" value="' + d.val + '"' + (checked ? ' checked' : '') + ' style="display:none" />'
               + esc(d.label)
               + '</label>';
@@ -1440,35 +1514,35 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
           + '<div class="form-group">'
           + '<label for="block-from-date">Active from</label>'
-          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
+          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
           + '</div>'
           + '<div class="form-group">'
           + '<label for="block-until-date">Until <span style="font-weight:400;color:var(--muted)">(optional)</span></label>'
-          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
+          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
           + '</div>'
           + '</div>'
           : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
           + '<div class="form-group">'
           + '<label for="block-from-date">From date</label>'
-          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
+          + '<input id="block-from-date" name="blockFromDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(S.newTimeBlockStartDate || '') + '" />'
           + '</div>'
           + '<div class="form-group">'
           + '<label for="block-until-date">To date <span style="font-weight:400;color:var(--muted)">(optional, same day if blank)</span></label>'
-          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
+          + '<input id="block-until-date" name="blockUntilDate" type="date" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" value="' + esc(S.newTimeBlockEndDate || '') + '" />'
           + '</div>'
           + '</div>'
         )
         + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
         + '<div class="form-group">'
         + '<label for="block-start-time">Start time</label>'
-        + '<input id="block-start-time" name="blockStartTime" type="time" value="' + esc(S.newTimeBlockStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="block-start-time" name="blockStartTime" type="time" value="' + esc(S.newTimeBlockStartTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
         + '<div class="form-group">'
         + '<label for="block-end-time">End time</label>'
-        + '<input id="block-end-time" name="blockEndTime" type="time" value="' + esc(S.newTimeBlockEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" />'
+        + '<input id="block-end-time" name="blockEndTime" type="time" value="' + esc(S.newTimeBlockEndTime) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" />'
         + '</div>'
         + '</div>'
-        + '<button class="btn" type="submit" style="background:#dc2626"' + (S.newTimeBlockSaving ? ' disabled' : '') + '>'
+        + '<button class="btn" type="submit" style="background:var(--error)"' + (S.newTimeBlockSaving ? ' disabled' : '') + '>'
         + (S.newTimeBlockSaving ? '<span class="spinner spinner-sm"></span> Blocking…' : '&#x1F6AB; Block time')
         + '</button>'
         + '</form>'
@@ -1478,11 +1552,11 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             ? '<p style="color:var(--muted);font-size:0.9rem">No blocked times yet. Add one above to prevent bookings during specific hours.</p>'
             : '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
             + '<table style="width:100%;border-collapse:collapse;font-size:0.9rem">'
-            + '<thead style="background:#fef2f2;border-bottom:1px solid var(--border)">'
+            + '<thead style="background:var(--panel);border-bottom:1px solid var(--border)">'
             + '<tr>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Type</th>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Schedule</th>'
-            + '<th style="padding:12px 16px;text-align:left;font-weight:600">Action</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Type</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Schedule</th>'
+            + '<th style="padding:12px 16px;text-align:left;font-weight:600;color:var(--text)">Action</th>'
             + '</tr>'
             + '</thead>'
             + '<tbody>'
@@ -1505,10 +1579,10 @@ export const BOOKING_HTML = `<!DOCTYPE html>
               if (block.title) scheduleText = block.title + ' — ' + scheduleText;
               var typeLabel = block.recurrence === 'weekly' ? 'Recurring' : block.recurrence === 'daily' ? 'Daily' : 'One-time';
               return '<tr style="border-bottom:1px solid var(--border)">'
-                + '<td style="padding:12px 16px"><span style="background:#fef2f2;color:#dc2626;padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
+                + '<td style="padding:12px 16px"><span style="background:color-mix(in srgb, var(--error) 8%, var(--panel));color:var(--error);padding:4px 8px;border-radius:4px;font-size:0.8rem;font-weight:600">' + esc(typeLabel) + '</span></td>'
                 + '<td style="padding:12px 16px"><code style="font-size:0.85rem">' + esc(scheduleText) + '</code></td>'
                 + '<td style="padding:12px 16px">'
-                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-delete-block-id="' + esc(block.id) + '">Delete</button>'
+                + '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:var(--error)" data-delete-block-id="' + esc(block.id) + '">Delete</button>'
                 + '</td>'
                 + '</tr>';
             }).join('')
@@ -1543,13 +1617,13 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         var active = S.appointmentsFilter === f;
         var label  = f === 'upcoming' ? 'Upcoming' : f === 'past' ? 'Past' : 'All';
         return '<button type="button" data-appt-filter="' + f + '" style="padding:8px 14px;border:none;border-radius:6px;font-size:0.9rem;font-weight:600;cursor:pointer;background:'
-          + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'white' : 'var(--muted)') + '">' + label + '</button>';
+          + (active ? 'var(--accent)' : 'transparent') + ';color:' + (active ? 'var(--panel)' : 'var(--muted)') + '">' + label + '</button>';
       }).join('');
 
       // ── Edit details form ────────────────────────────────────────────
       var editFormHtml = '';
       if (editAppt) {
-        editFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        editFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--panel)">' 
           + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Edit appointment details</h4>'
           + '<form id="edit-appt-form">'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
@@ -1571,13 +1645,13 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       var reschedFormHtml = '';
       if (reschedAppt) {
         var rTz = reschedAppt.timezone || S.tz;
-        reschedFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        reschedFormHtml = '<div style="border:1px solid var(--accent);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--panel)">' 
           + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">Reschedule appointment</h4>'
           + '<p style="margin:0 0 12px;font-size:0.85rem;color:var(--muted)">Current: ' + esc(fmtYmdInTimezone(reschedAppt.startTime, rTz) + ' ' + fmtTimeInTimezone(reschedAppt.startTime, rTz) + ' (' + rTz + ')') + '</p>'
           + '<form id="reschedule-appt-form">'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
-          + '<div class="form-group"><label>New date</label><input name="reschedDate" type="date" value="' + esc(fmtYmdInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
-          + '<div class="form-group"><label>New start time</label><input name="reschedTime" type="time" value="' + esc(fmtTimeInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '<div class="form-group"><label>New date</label><input name="reschedDate" type="date" value="' + esc(fmtYmdInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" /></div>'
+          + '<div class="form-group"><label>New start time</label><input name="reschedTime" type="time" value="' + esc(fmtTimeInTimezone(reschedAppt.startTime, rTz)) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" /></div>'
           + '</div>'
           + (S.apptActionError ? '<div class="alert-error">' + esc(S.apptActionError) + '</div>' : '')
           + '<div style="display:flex;gap:10px">'
@@ -1591,7 +1665,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       // ── Add appointment form ─────────────────────────────────────────
       var addFormHtml = '';
       if (S.addingAppt) {
-        addFormHtml = '<div style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--accent-lite)">'
+        addFormHtml = '<div style="border:1px solid var(--border);border-radius:10px;padding:20px;margin-bottom:16px;background:var(--panel)">' 
           + '<h4 style="margin:0 0 16px;font-size:0.95rem;font-weight:600">New appointment</h4>'
           + '<form id="new-appt-form">'
           + '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'
@@ -1600,9 +1674,9 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           + '</div>'
           + '<div class="form-group"><label>Phone <span style="font-weight:400;color:var(--muted)">(optional)</span></label><input name="clientPhone" type="tel" style="width:100%" /></div>'
           + '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">'
-          + '<div class="form-group"><label>Date <span style="color:var(--accent)">*</span></label><input name="apptDate" type="date" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
-          + '<div class="form-group"><label>Start time <span style="color:var(--accent)">*</span></label><input name="apptTime" type="time" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
-          + '<div class="form-group"><label>Duration (min)</label><input name="apptDuration" type="number" min="15" max="480" value="' + (S.duration || 60) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px" /></div>'
+          + '<div class="form-group"><label>Date <span style="color:var(--accent)">*</span></label><input name="apptDate" type="date" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" /></div>'
+          + '<div class="form-group"><label>Start time <span style="color:var(--accent)">*</span></label><input name="apptTime" type="time" required style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" /></div>'
+          + '<div class="form-group"><label>Duration (min)</label><input name="apptDuration" type="number" min="15" max="480" value="' + (S.duration || 60) + '" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;background:var(--panel)" /></div>'
           + '</div>'
           + '<div class="form-group"><label>Notes <span style="font-weight:400;color:var(--muted)">(optional)</span></label><textarea name="notes" style="width:100%"></textarea></div>'
           + (S.apptActionError ? '<div class="alert-error">' + esc(S.apptActionError) + '</div>' : '')
@@ -1627,12 +1701,12 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       } else {
         tableHtml = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
           + '<table style="width:100%;border-collapse:collapse;font-size:0.88rem">'
-          + '<thead style="background:var(--accent-lite);border-bottom:1px solid var(--border)">'
+          + '<thead style="background:var(--panel);border-bottom:1px solid var(--border)">'
           + '<tr>'
-          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Date &amp; Time</th>'
-          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Client</th>'
-          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Status</th>'
-          + '<th style="padding:10px 16px;text-align:left;font-weight:600">Actions</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600;color:var(--text)">Date &amp; Time</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600;color:var(--text)">Client</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600;color:var(--text)">Status</th>'
+          + '<th style="padding:10px 16px;text-align:left;font-weight:600;color:var(--text)">Actions</th>'
           + '</tr>'
           + '</thead>'
           + '<tbody>'
@@ -1640,8 +1714,8 @@ export const BOOKING_HTML = `<!DOCTYPE html>
               var tz = appt.timezone || S.tz;
               var dateStr = fmtYmdInTimezone(appt.startTime, tz) + ' ' + fmtTimeInTimezone(appt.startTime, tz);
               var isCancelled = appt.status === 'cancelled';
-              var statusBg    = isCancelled ? '#fee2e2' : 'var(--accent-lite)';
-              var statusColor = isCancelled ? '#dc2626' : '#0f766e';
+              var statusBg    = isCancelled ? 'color-mix(in srgb, var(--error) 8%, var(--panel))' : 'color-mix(in srgb, var(--accent) 8%, var(--panel))';
+              var statusColor = isCancelled ? 'var(--error)' : 'var(--accent)';
               return '<tr style="border-bottom:1px solid var(--border)">'
                 + '<td style="padding:10px 16px"><code style="font-size:0.82rem">' + esc(dateStr) + '</code>'
                 + '<br><span style="font-size:0.75rem;color:var(--muted)">' + esc(tz) + '</span></td>'
@@ -1653,7 +1727,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
                 + '<td style="padding:10px 16px;white-space:nowrap">'
                 + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;margin-right:4px" data-edit-appt-id="' + esc(appt.id) + '">Edit</button>' : '')
                 + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;margin-right:4px" data-reschedule-appt-id="' + esc(appt.id) + '">Move</button>' : '')
-                + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:#dc2626" data-cancel-appt-id="' + esc(appt.id) + '">Cancel</button>' : '')
+                + (!isCancelled ? '<button class="btn btn-ghost" style="padding:4px 8px;font-size:0.8rem;color:var(--error)" data-cancel-appt-id="' + esc(appt.id) + '">Cancel</button>' : '')
                 + '</td>'
                 + '</tr>';
             }).join('')
@@ -1669,7 +1743,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + '<h2 style="margin:4px 0 0">' + esc(org.name) + '</h2></div>'
         + '</div>'
         + '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px">'
-        + '<div style="display:flex;background:white;border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px">' + filterTabs + '</div>'
+        + '<div style="display:flex;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:3px;gap:3px">' + filterTabs + '</div>'
         + '<button class="btn" id="appt-add-toggle">' + (S.addingAppt ? '&#10005; Close' : '+ Add appointment') + '</button>'
         + '</div>'
         + (S.apptActionMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.apptActionMessage) + '</p>' : '')
@@ -1685,7 +1759,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         + tmplEmailBanner()
         + '<span class="chip">Admin</span>'
         + '<h2>Your workspace</h2>'
-        + '<p><strong style="font-size:0.95rem">User ID:</strong> <code style="display:block;background:var(--accent-lite);padding:8px;border-radius:6px;margin-top:4px;font-family:monospace;font-size:0.85rem">' + esc(S.userId) + '</code></p>'
+        + '<p><strong style="font-size:0.95rem">User ID:</strong> <code style="display:block;background:color-mix(in srgb, var(--accent) 8%, var(--panel));padding:8px;border-radius:6px;margin-top:4px;font-family:monospace;font-size:0.85rem">' + esc(S.userId) + '</code></p>'
         + '<p style="margin-top:20px;color:var(--muted)">Manage your organizations below. Use the settings panel for team management, schedule configuration, and branding.</p>'
         + '<div class="org-select-list">' + tmplAdminOrgList(true) + '</div>'
         + '<div style="margin-top:20px;padding-top:20px;border-top:1px solid var(--border)">'
@@ -2130,7 +2204,29 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
         S.step = 'admin';
+        resetTheme();
         render();
+        return;
+      }
+
+      // Theme preset buttons
+      if (e.target && (e.target.id === 'theme-preset-light' || e.target.id === 'theme-preset-dark')) {
+        var presets = {
+          light: { primary: '#0f766e', secondary: '#d1faf3', bg: '#f3efe7', fg: '#1f2937', font: 'Georgia, serif' },
+          dark:  { primary: '#22d3ee', secondary: '#164e63', bg: '#0f172a', fg: '#e2e8f0', font: 'Arial, sans-serif' }
+        };
+        var p = e.target.id === 'theme-preset-dark' ? presets.dark : presets.light;
+        var form = document.getElementById('settings-org-form');
+        if (form) {
+          form.querySelector('[name="primaryColor"]').value = p.primary;
+          form.querySelector('[name="secondaryColor"]').value = p.secondary;
+          form.querySelector('[name="backgroundColor"]').value = p.bg;
+          form.querySelector('[name="foregroundColor"]').value = p.fg;
+          var fontSel = form.querySelector('[name="fontFamily"]');
+          for (var i = 0; i < fontSel.options.length; i++) {
+            if (fontSel.options[i].value === p.font) { fontSel.selectedIndex = i; break; }
+          }
+        }
         return;
       }
 
@@ -2169,6 +2265,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           S.bookingLinksLoading = false;
           S.availabilitiesLoading = false;
           S.timeBlocksLoading = false;
+          applyTheme(S.settingsOrg);
           render();
         }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; S.timeBlocksLoading = false; render(); });
         return;
@@ -2333,12 +2430,14 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         if (S.settingsSaving) return;
         var sf = e.target;
         var sb = {
-          name:           sf.querySelector('[name="name"]').value.trim(),
-          description:    sf.querySelector('[name="description"]').value.trim(),
-          logoUrl:        sf.querySelector('[name="logoUrl"]').value.trim(),
-          primaryColor:   sf.querySelector('[name="primaryColor"]').value,
-          secondaryColor: sf.querySelector('[name="secondaryColor"]').value,
-          fontFamily:     sf.querySelector('[name="fontFamily"]').value,
+          name:            sf.querySelector('[name="name"]').value.trim(),
+          description:     sf.querySelector('[name="description"]').value.trim(),
+          logoUrl:         sf.querySelector('[name="logoUrl"]').value.trim(),
+          primaryColor:    sf.querySelector('[name="primaryColor"]').value,
+          secondaryColor:  sf.querySelector('[name="secondaryColor"]').value,
+          backgroundColor: sf.querySelector('[name="backgroundColor"]').value,
+          foregroundColor: sf.querySelector('[name="foregroundColor"]').value,
+          fontFamily:      sf.querySelector('[name="fontFamily"]').value,
         };
         S.settingsSaving = true; S.settingsError = null; S.settingsMessage = null; render();
         apiFetch('/api/organizations/' + S.settingsOrg.id + '/admin/settings', { method: 'PATCH', body: sb })
@@ -2347,6 +2446,7 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             S.organizations = (S.organizations || []).map(function(o) {
               return o.id === updated.id ? Object.assign({}, o, updated) : o;
             });
+            applyTheme(updated);
             S.settingsSaving = false; S.settingsMessage = 'Settings saved!'; render();
             setTimeout(function() { S.settingsMessage = null; render(); }, 3000);
           }).catch(function(err) {

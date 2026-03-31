@@ -41,6 +41,7 @@ export async function runMigrations(): Promise<void> {
     { name: '004_nullable_session_org', sql: migration004 },
     { name: '005_booking_links', sql: migration005 },
     { name: '006_time_blocks', sql: migration006 },
+    { name: '007_org_bg_fg_colors', sql: migration007 },
   ];
 
   for (const migration of migrations) {
@@ -319,4 +320,12 @@ const migration006 = `
   CREATE INDEX idx_time_blocks_org_id     ON time_blocks (organization_id);
   CREATE INDEX idx_time_blocks_user_id    ON time_blocks (user_id);
   CREATE INDEX idx_time_blocks_start_time ON time_blocks (start_time);
+`;
+
+/**
+ * Migration 007: Add background and foreground color columns to organizations
+ */
+const migration007 = `
+  ALTER TABLE organizations ADD COLUMN IF NOT EXISTS background_color VARCHAR(7);
+  ALTER TABLE organizations ADD COLUMN IF NOT EXISTS foreground_color VARCHAR(7);
 `;

@@ -6,7 +6,7 @@
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 
-> **Progress: 156 / 172 items complete (91%)**
+> **Progress: 164 / 180 items complete (91%)**
 > Last updated: 2026-03-30
 
 ### Remaining work (16 items)
@@ -118,6 +118,14 @@
     - [x] COMPLETED Color scheme customization (primaryColor, secondaryColor fields)
     - [x] COMPLETED Custom logo upload and display (logoUrl field)
     - [x] COMPLETED Font family settings (fontFamily field)
+    - [x] COMPLETED Add backgroundColor and foregroundColor fields (migration007, full-stack)
+    - [x] COMPLETED Implement dynamic theme application (applyTheme/resetTheme CSS variable override in src/client.ts)
+    - [x] COMPLETED Replace all hardcoded CSS colors with var() references across admin and booking UI
+    - [x] COMPLETED Migrate all accent-lite usages to color-mix(in srgb) tint pattern for dark-theme compatibility
+    - [x] COMPLETED Add color:inherit global rule for form elements, code, buttons
+    - [x] COMPLETED Remove body gradient in favor of flat var(--bg) background
+    - [x] COMPLETED Add box-shadow to availability and blocked-time forms
+    - [x] COMPLETED Add light/dark theme preset buttons with curated palettes
   - [x] COMPLETED Implement per-user settings (GET/PATCH /api/users/me for firstName, lastName, timezone, profileImageUrl)
   - [x] COMPLETED Create role permission matrix (src/utils/permissions.ts with Permission enum and hasPermission checks)
   - [x] COMPLETED Create admin dashboard endpoint (GET /api/organizations/:id/admin/dashboard with stats)

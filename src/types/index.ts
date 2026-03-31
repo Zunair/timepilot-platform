@@ -77,6 +77,8 @@ export interface Organization {
   logoUrl?: string;
   primaryColor?: string;
   secondaryColor?: string;
+  backgroundColor?: string;
+  foregroundColor?: string;
   fontFamily?: string;
   logoUploadedAt?: string;
   createdAt: string; // ISO 8601 UTC

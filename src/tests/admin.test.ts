@@ -100,7 +100,7 @@ describe('Admin Organization Management', () => {
       {
         endpoint: 'PATCH /api/organizations/:id/admin/settings',
         requiredRoles: [RoleType.OWNER, RoleType.ADMIN],
-        allowedFields: ['name', 'description', 'logoUrl', 'primaryColor', 'secondaryColor', 'fontFamily'],
+        allowedFields: ['name', 'description', 'logoUrl', 'primaryColor', 'secondaryColor', 'backgroundColor', 'foregroundColor', 'fontFamily'],
       },
       {
         endpoint: 'GET /api/users/me',

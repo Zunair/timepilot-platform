@@ -33,9 +33,11 @@ organizationsRouter.get('/slug/:slug', async (req: Request, res: Response) => {
     slug:           org.slug,
     description:    org.description,
     logoUrl:        org.logoUrl,
-    primaryColor:   org.primaryColor,
-    secondaryColor: org.secondaryColor,
-    fontFamily:     org.fontFamily,
+    primaryColor:      org.primaryColor,
+    secondaryColor:    org.secondaryColor,
+    backgroundColor:   org.backgroundColor,
+    foregroundColor:   org.foregroundColor,
+    fontFamily:        org.fontFamily,
   });
 });
 
@@ -216,6 +218,8 @@ organizationsRouter.patch(
       logoUrl,
       primaryColor,
       secondaryColor,
+      backgroundColor,
+      foregroundColor,
       fontFamily,
     } = req.body as {
       name?: string;
@@ -223,6 +227,8 @@ organizationsRouter.patch(
       logoUrl?: string;
       primaryColor?: string;
       secondaryColor?: string;
+      backgroundColor?: string;
+      foregroundColor?: string;
       fontFamily?: string;
     };
 
@@ -232,6 +238,8 @@ organizationsRouter.patch(
     if (logoUrl !== undefined) updates.logoUrl = logoUrl;
     if (primaryColor !== undefined) updates.primaryColor = primaryColor;
     if (secondaryColor !== undefined) updates.secondaryColor = secondaryColor;
+    if (backgroundColor !== undefined) updates.backgroundColor = backgroundColor;
+    if (foregroundColor !== undefined) updates.foregroundColor = foregroundColor;
     if (fontFamily !== undefined) updates.fontFamily = fontFamily;
 
     if (Object.keys(updates).length === 0) {
