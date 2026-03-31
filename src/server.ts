@@ -18,6 +18,7 @@ import { organizationsRouter } from './routes/organizations.routes.js';
 import { userRouter } from './routes/users.routes.js';
 import { bookingLinksRouter } from './routes/booking-links.routes.js';
 import { publicBookingRouter } from './routes/public-booking.routes.js';
+import { emailTemplatesRouter } from './routes/email-templates.routes.js';
 import { startNotificationWorker } from './workers/NotificationWorker.js';
 
 const app = express();
@@ -66,6 +67,7 @@ app.use('/api/organizations/:organizationId/availability', availabilityRouter);
 app.use('/api/organizations/:organizationId/time-blocks', timeBlocksRouter);
 app.use('/api/organizations/:organizationId/appointments', appointmentsRouter);
 app.use('/api/organizations/:organizationId/booking-links', bookingLinksRouter);
+app.use('/api/organizations/:organizationId/email-templates', emailTemplatesRouter);
 app.use('/api/b', publicBookingRouter);
 
 // ============================================================================

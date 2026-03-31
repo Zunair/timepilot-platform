@@ -18,6 +18,8 @@ import { env } from '../config/env.js';
 import { AvailabilityType, RoleType } from '../types/index.js';
 import type { UUID } from '../types/index.js';
 import { isValidTimezone, localDateTimeInTimezoneToUTC } from '../utils/timezone.js';
+import { sendViaGoogleUserMailbox } from '../services/GoogleMailboxService.js';
+import { sendViaMicrosoftUserMailbox } from '../services/MicrosoftMailboxService.js';
 
 type OAuthEnvShape = {
   GOOGLE_CLIENT_ID?: string;
@@ -111,7 +113,7 @@ interface OAuthRefreshResponse {
   error_description?: string;
 }
 
-type OAuthStateAction = 'login' | 'enable_google_mail';
+type OAuthStateAction = 'login' | 'enable_google_mail' | 'enable_microsoft_mail';
 
 interface OAuthStatePayload {
   v: 1;
@@ -264,7 +266,7 @@ export function parseOAuthState(value?: string): {
   try {
     const decoded = Buffer.from(value!, 'base64url').toString('utf-8');
     const parsed = JSON.parse(decoded) as Partial<OAuthStatePayload>;
-    if (parsed.action === 'login' || parsed.action === 'enable_google_mail') {
+    if (parsed.action === 'login' || parsed.action === 'enable_google_mail' || parsed.action === 'enable_microsoft_mail') {
       return {
         action: parsed.action,
         organizationSlug: hasValue(parsed.organizationSlug) ? parsed.organizationSlug : undefined,
@@ -430,7 +432,7 @@ export function buildMicrosoftOAuthAuthorizeUrl(state: string, cfg: OAuthEnvShap
     redirect_uri: cfg.MICROSOFT_CALLBACK_URL!.trim(),
     response_type: 'code',
     response_mode: 'query',
-    scope: 'openid profile email User.Read',
+    scope: 'openid profile email User.Read offline_access',
     state,
   });
   return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
@@ -722,6 +724,83 @@ authRouter.get('/google/enable-email-scope', async (req: Request, res: Response)
 });
 
 /**
+ * GET /api/auth/microsoft/email-scope-status
+ * Returns whether the current user has Microsoft Mail.Send scope granted.
+ */
+authRouter.get('/microsoft/email-scope-status', async (req: Request, res: Response) => {
+  const sessionId = sessionService.parseSessionId(req.headers.cookie);
+  if (!sessionId) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'No session cookie' });
+    return;
+  }
+
+  const payload = await sessionService.validate(sessionId).catch(() => null);
+  if (!payload) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Session expired or invalid' });
+    return;
+  }
+
+  const account = await oauthAccountRepository.findByUserAndProvider(payload.userId, 'microsoft');
+  const scope = account?.scope ?? '';
+  const hasMailSend = scope.split(/\s+/).some((s) => s.toLowerCase() === 'mail.send');
+  res.json({
+    microsoftLinked: Boolean(account),
+    enabled: hasMailSend,
+  });
+});
+
+/**
+ * GET /api/auth/microsoft/enable-email-scope
+ * Starts incremental Microsoft consent for Mail.Send after login.
+ */
+authRouter.get('/microsoft/enable-email-scope', async (req: Request, res: Response) => {
+  const providers = getOAuthProviderAvailability();
+  if (!providers.microsoft) {
+    res.status(503).json({
+      error: 'OAUTH_PROVIDER_DISABLED',
+      message: 'Microsoft OAuth is not configured for this environment',
+    });
+    return;
+  }
+
+  const sessionId = sessionService.parseSessionId(req.headers.cookie);
+  if (!sessionId) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'No session cookie' });
+    return;
+  }
+  const payload = await sessionService.validate(sessionId).catch(() => null);
+  if (!payload) {
+    res.status(401).json({ error: 'UNAUTHORIZED', message: 'Session expired or invalid' });
+    return;
+  }
+
+  const returnTo = sanitizeReturnTo(parseRequestParam(req, 'returnTo'));
+  const state = buildOAuthState({
+    v: 1,
+    action: 'enable_microsoft_mail',
+    returnTo,
+  });
+
+  if (!hasValue(env.MICROSOFT_CLIENT_ID) || !hasValue(env.MICROSOFT_CALLBACK_URL)) {
+    res.status(503).json({ error: 'OAUTH_PROVIDER_DISABLED', message: 'Microsoft OAuth is not configured' });
+    return;
+  }
+
+  const params = new URLSearchParams({
+    client_id: env.MICROSOFT_CLIENT_ID!.trim(),
+    redirect_uri: env.MICROSOFT_CALLBACK_URL!.trim(),
+    response_type: 'code',
+    response_mode: 'query',
+    scope: 'openid profile email User.Read Mail.Send offline_access',
+    prompt: 'consent',
+    state,
+  });
+
+  const authorizeUrl = `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+  res.redirect(authorizeUrl);
+});
+
+/**
  * POST /api/auth/providers/:provider/refresh
  * Refreshes an expired or near-expiry provider access token for the current user.
  */
@@ -940,6 +1019,16 @@ authRouter.get('/google/callback', async (req, res) => {
     }
     if (state.action === 'enable_google_mail') {
       redirectTo = appendQuery(redirectTo, 'emailScopeEnabled', '1');
+      // Fire-and-forget confirmation email to self
+      sendViaGoogleUserMailbox({
+        userId: loginResolution.userId,
+        recipient: profile.email!,
+        subject: 'Gmail sending is now active',
+        html: '<h2>Gmail connected successfully</h2>'
+          + '<p>Your Gmail account is now linked for sending booking notifications on your behalf.</p>'
+          + '<p style="color:#6b7280;font-size:0.9em">This is an automated confirmation. No action is required.</p>'
+          + '<p style="color:#9ca3af;font-size:0.8em;margin-top:24px">Notifications — Powered By IST Systems</p>',
+      }).catch((err) => console.error('[Auth] Gmail confirmation email failed:', err));
     }
 
     res.redirect(redirectTo);
@@ -1162,6 +1251,19 @@ authRouter.get('/microsoft/callback', async (req, res) => {
     let redirectTo = returnTo;
     if (loginResolution.requiresOrganizationSelection) {
       redirectTo = appendQuery(redirectTo, 'selectOrg', '1');
+    }
+    if (state.action === 'enable_microsoft_mail') {
+      redirectTo = appendQuery(redirectTo, 'emailScopeEnabled', '1');
+      // Fire-and-forget confirmation email to self
+      sendViaMicrosoftUserMailbox({
+        userId: loginResolution.userId,
+        recipient: email,
+        subject: 'Outlook sending is now active',
+        html: '<h2>Outlook connected successfully</h2>'
+          + '<p>Your Outlook account is now linked for sending booking notifications on your behalf.</p>'
+          + '<p style="color:#6b7280;font-size:0.9em">This is an automated confirmation. No action is required.</p>'
+          + '<p style="color:#9ca3af;font-size:0.8em;margin-top:24px">Notifications — Powered By IST Systems</p>',
+      }).catch((err) => console.error('[Auth] Outlook confirmation email failed:', err));
     }
     res.redirect(redirectTo);
   } catch (error) {

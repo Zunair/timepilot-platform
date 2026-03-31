@@ -42,6 +42,8 @@ export async function runMigrations(): Promise<void> {
     { name: '005_booking_links', sql: migration005 },
     { name: '006_time_blocks', sql: migration006 },
     { name: '007_org_bg_fg_colors', sql: migration007 },
+    { name: '008_booking_rescheduled_type', sql: migration008 },
+    { name: '009_email_templates', sql: migration009 },
   ];
 
   for (const migration of migrations) {
@@ -328,4 +330,39 @@ const migration006 = `
 const migration007 = `
   ALTER TABLE organizations ADD COLUMN IF NOT EXISTS background_color VARCHAR(7);
   ALTER TABLE organizations ADD COLUMN IF NOT EXISTS foreground_color VARCHAR(7);
+`;
+
+/**
+ * Migration 008: Add booking_rescheduled notification type
+ *
+ * Updates the CHECK constraint on the notifications.type column to include
+ * the new booking_rescheduled value for appointment move notifications.
+ */
+const migration008 = `
+  ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_type_check;
+  ALTER TABLE notifications ADD CONSTRAINT notifications_type_check
+    CHECK (type IN ('booking_confirmation', 'booking_reminder', 'booking_cancellation', 'booking_rescheduled'));
+`;
+
+/**
+ * Migration 009: Email Templates
+ *
+ * Per-organization customizable notification email templates.
+ * Falls back to built-in defaults when no row exists for an org + type.
+ */
+const migration009 = `
+  CREATE TABLE IF NOT EXISTS email_templates (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    organization_id UUID NOT NULL REFERENCES organizations (id) ON DELETE CASCADE,
+    type VARCHAR(100) NOT NULL,
+    subject TEXT NOT NULL,
+    html_body TEXT NOT NULL,
+    text_body TEXT NOT NULL DEFAULT '',
+    is_active BOOLEAN NOT NULL DEFAULT true,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    UNIQUE (organization_id, type)
+  );
+
+  CREATE INDEX idx_email_templates_org_id ON email_templates (organization_id);
 `;

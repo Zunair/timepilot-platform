@@ -4,22 +4,22 @@ import { oauthAccountRepository } from '../repositories/OAuthAccountRepository.j
 import type { OAuthAccountRecord } from '../repositories/OAuthAccountRepository.js';
 import type { UUID } from '../types/index.js';
 
+const MS_MAIL_SEND_SCOPE = 'Mail.Send';
+
 export interface EmailAttachment {
   filename: string;
   content: string;       // base64-encoded content
-  contentType: string;   // MIME type
+  contentType: string;   // MIME type, e.g. 'text/calendar'
 }
-
-const GMAIL_SEND_SCOPE = 'https://www.googleapis.com/auth/gmail.send';
 
 function hasValue(v: unknown): v is string {
   return typeof v === 'string' && v.trim().length > 0;
 }
 
-function hasGmailSendScope(scope?: unknown): boolean {
+export function hasMicrosoftMailSendScope(scope?: unknown): boolean {
   if (!hasValue(scope)) return false;
   const scopes = scope.split(/\s+/).map((s) => s.trim()).filter(Boolean);
-  return scopes.includes(GMAIL_SEND_SCOPE) || scopes.includes('gmail.send');
+  return scopes.some((s) => s.toLowerCase() === MS_MAIL_SEND_SCOPE.toLowerCase());
 }
 
 function computeAccessTokenExpiry(expiresInSeconds?: number): string | undefined {
@@ -34,54 +34,6 @@ function hasFreshAccessToken(expiresAt?: unknown, skewSeconds = 60): boolean {
   const expiresAtMs = Date.parse(expiresAt);
   if (Number.isNaN(expiresAtMs)) return false;
   return expiresAtMs > Date.now() + skewSeconds * 1000;
-}
-
-function toBase64Url(value: string): string {
-  return Buffer.from(value, 'utf-8').toString('base64url');
-}
-
-function buildRawMimeEmail(from: string, to: string, subject: string, html: string, attachments?: EmailAttachment[]): string {
-  if (!attachments || attachments.length === 0) {
-    // Simple single-part HTML email
-    const mime = [
-      `From: ${from}`,
-      `To: ${to}`,
-      `Subject: ${subject}`,
-      'MIME-Version: 1.0',
-      'Content-Type: text/html; charset=UTF-8',
-      '',
-      html,
-    ].join('\r\n');
-    return toBase64Url(mime);
-  }
-
-  // Multipart MIME with attachments
-  const boundary = `----=_Part_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const parts: string[] = [
-    `From: ${from}`,
-    `To: ${to}`,
-    `Subject: ${subject}`,
-    'MIME-Version: 1.0',
-    `Content-Type: multipart/mixed; boundary="${boundary}"`,
-    '',
-    `--${boundary}`,
-    'Content-Type: text/html; charset=UTF-8',
-    'Content-Transfer-Encoding: 7bit',
-    '',
-    html,
-  ];
-
-  for (const att of attachments) {
-    parts.push(`--${boundary}`);
-    parts.push(`Content-Type: ${att.contentType}; name="${att.filename}"`);
-    parts.push('Content-Transfer-Encoding: base64');
-    parts.push(`Content-Disposition: attachment; filename="${att.filename}"`);
-    parts.push('');
-    parts.push(att.content);
-  }
-
-  parts.push(`--${boundary}--`);
-  return toBase64Url(parts.join('\r\n'));
 }
 
 async function getUserEmail(userId: UUID): Promise<string | null> {
@@ -99,18 +51,19 @@ interface RefreshResponse {
   scope?: string;
 }
 
-async function refreshGoogleAccessToken(account: OAuthAccountRecord): Promise<OAuthAccountRecord | null> {
+async function refreshMicrosoftAccessToken(account: OAuthAccountRecord): Promise<OAuthAccountRecord | null> {
   if (!hasValue(account.refreshToken)) return null;
-  if (!hasValue(env.GOOGLE_CLIENT_ID) || !hasValue(env.GOOGLE_CLIENT_SECRET)) return null;
+  if (!hasValue(env.MICROSOFT_CLIENT_ID) || !hasValue(env.MICROSOFT_CLIENT_SECRET)) return null;
 
   const body = new URLSearchParams({
-    client_id: env.GOOGLE_CLIENT_ID,
-    client_secret: env.GOOGLE_CLIENT_SECRET,
+    client_id: env.MICROSOFT_CLIENT_ID,
+    client_secret: env.MICROSOFT_CLIENT_SECRET,
     grant_type: 'refresh_token',
     refresh_token: account.refreshToken,
+    scope: 'openid profile email User.Read Mail.Send offline_access',
   });
 
-  const response = await fetch('https://oauth2.googleapis.com/token', {
+  const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: body.toString(),
@@ -122,7 +75,7 @@ async function refreshGoogleAccessToken(account: OAuthAccountRecord): Promise<OA
 
   const updated = await oauthAccountRepository.upsert({
     userId: account.userId,
-    provider: 'google',
+    provider: 'microsoft',
     providerUserId: account.providerUserId,
     accessToken: refreshed.access_token,
     refreshToken: refreshed.refresh_token,
@@ -134,20 +87,20 @@ async function refreshGoogleAccessToken(account: OAuthAccountRecord): Promise<OA
   return updated;
 }
 
-export async function sendViaGoogleUserMailbox(params: {
+export async function sendViaMicrosoftUserMailbox(params: {
   userId: UUID;
   recipient: string;
   subject: string;
   html: string;
   attachments?: EmailAttachment[];
 }): Promise<boolean> {
-  const account = await oauthAccountRepository.findByUserAndProvider(params.userId, 'google');
+  const account = await oauthAccountRepository.findByUserAndProvider(params.userId, 'microsoft');
   if (!account) return false;
-  if (!hasGmailSendScope(account.scope)) return false;
+  if (!hasMicrosoftMailSendScope(account.scope)) return false;
 
   let senderAccount = account;
   if (!hasFreshAccessToken(senderAccount.accessTokenExpiresAt)) {
-    const refreshed = await refreshGoogleAccessToken(senderAccount);
+    const refreshed = await refreshMicrosoftAccessToken(senderAccount);
     if (!refreshed) return false;
     senderAccount = refreshed;
   }
@@ -157,15 +110,39 @@ export async function sendViaGoogleUserMailbox(params: {
   const senderEmail = await getUserEmail(params.userId);
   if (!senderEmail) return false;
 
-  const raw = buildRawMimeEmail(senderEmail, params.recipient, params.subject, params.html, params.attachments);
-  const response = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+  const graphAttachments = (params.attachments ?? []).map((att) => ({
+    '@odata.type': '#microsoft.graph.fileAttachment',
+    name: att.filename,
+    contentType: att.contentType,
+    contentBytes: att.content,
+  }));
+
+  const message: Record<string, unknown> = {
+    subject: params.subject,
+    body: {
+      contentType: 'HTML',
+      content: params.html,
+    },
+    from: {
+      emailAddress: { address: senderEmail },
+    },
+    toRecipients: [
+      { emailAddress: { address: params.recipient } },
+    ],
+  };
+
+  if (graphAttachments.length > 0) {
+    message.attachments = graphAttachments;
+  }
+
+  const response = await fetch('https://graph.microsoft.com/v1.0/me/sendMail', {
     method: 'POST',
     headers: {
       Authorization: `Bearer ${senderAccount.accessToken}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({ raw }),
+    body: JSON.stringify({ message, saveToSentItems: true }),
   });
 
-  return response.ok;
+  return response.ok || response.status === 202;
 }

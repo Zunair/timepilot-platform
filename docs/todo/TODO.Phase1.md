@@ -6,7 +6,7 @@
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 
-> **Progress: 164 / 180 items complete (91%)**
+> **Progress: 180 / 196 items complete (92%)**
 > Last updated: 2026-03-30
 
 ### Remaining work (16 items)
@@ -177,6 +177,41 @@
   - [x] COMPLETED Add Google mailbox send path in notification worker with SMTP fallback
   - [x] COMPLETED Harden malformed OAuth mailbox data handling and Twilio startup validation
   - [ ] NOT-STARTED Add end-to-end worker tests for Google mailbox delivery and fallback behavior
+
+- [x] COMPLETED Add Microsoft Outlook sending via Graph API
+  - [x] COMPLETED Create MicrosoftMailboxService with token refresh and Mail.Send scope (src/services/MicrosoftMailboxService.ts)
+  - [x] COMPLETED Add Microsoft incremental consent endpoint for Mail.Send scope (src/routes/auth.routes.ts)
+  - [x] COMPLETED Add offline_access to initial Microsoft OAuth authorize URL (src/routes/auth.routes.ts)
+  - [x] COMPLETED Update NotificationWorker delivery chain: Google → Microsoft → SMTP (src/workers/NotificationWorker.ts)
+  - [x] COMPLETED Add MicrosoftMailboxService unit tests (src/tests/microsoft-mailbox-service.test.ts)
+
+- [x] COMPLETED Add .ics calendar file attachments
+  - [x] COMPLETED Create RFC 5545 .ics file generator utility (src/utils/icsGenerator.ts)
+  - [x] COMPLETED Update GoogleMailboxService to support multipart MIME with attachments (src/services/GoogleMailboxService.ts)
+  - [x] COMPLETED Integrate .ics into all email paths: Google, Microsoft, SMTP (src/workers/NotificationWorker.ts)
+  - [x] COMPLETED Add .ics generator unit tests (src/tests/ics-generator.test.ts)
+
+- [x] COMPLETED Add booking rescheduled notification type
+  - [x] COMPLETED Add BOOKING_RESCHEDULED to NotificationType enum (src/types/index.ts)
+  - [x] COMPLETED Add migration 008: update notifications CHECK constraint (src/db/migrate.ts)
+  - [x] COMPLETED Wire AppointmentService.reschedule to enqueue BOOKING_RESCHEDULED notification (src/services/AppointmentService.ts)
+
+- [x] COMPLETED Add send-to-self (organizer CC) for all notification types
+  - [x] COMPLETED Enqueue additional EMAIL notification for organizer in NotificationService (src/services/NotificationService.ts)
+
+- [x] COMPLETED Add database-driven email templates with org-scoped CRUD
+  - [x] COMPLETED Create email_templates table migration 009 with tenant isolation (src/db/migrate.ts)
+  - [x] COMPLETED Build EmailTemplateRepository with findByOrgAndType, upsert, delete (src/repositories/EmailTemplateRepository.ts)
+  - [x] COMPLETED Create email template REST API with RBAC (src/routes/email-templates.routes.ts)
+  - [x] COMPLETED Register email-templates routes in server (src/server.ts)
+  - [x] COMPLETED Build template renderer with {{variable}} placeholders and XSS sanitization (src/utils/templateRenderer.ts)
+  - [x] COMPLETED Update NotificationWorker to load DB templates before falling back to defaults (src/workers/NotificationWorker.ts)
+  - [x] COMPLETED Add template rendering unit tests (src/tests/email-templates.test.ts)
+
+- [x] COMPLETED Add admin UI for email template management and provider status
+  - [x] COMPLETED Build Email Provider section with Gmail/Outlook connection status and enable buttons (src/client.ts)
+  - [x] COMPLETED Build Email Templates section with edit/preview/save/reset per template type (src/client.ts)
+  - [x] COMPLETED Load email templates and provider status on settings panel open (src/client.ts)
 
 ## Post-Login Onboarding
 - [ ] IN-PROGRESS Add admin landing and zero-org onboarding flow

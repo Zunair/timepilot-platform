@@ -143,6 +143,12 @@ export class AppointmentService {
       startTime: params.startTime,
       endTime: params.endTime,
       timezone: params.timezone,
+    }).then((rescheduled) => {
+      // Fire-and-forget — notification failure must not roll back a successful reschedule.
+      notificationService
+        .enqueueForAppointment(rescheduled, NotificationType.BOOKING_RESCHEDULED)
+        .catch(err => console.error('[AppointmentService] reschedule notification failed:', err));
+      return rescheduled;
     });
   }
 

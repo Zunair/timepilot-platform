@@ -9,16 +9,26 @@
  *  - Retries up to 5 times with exponential back-off (1 min, 2 min, 4 min …).
  *  - Idempotency keys prevent duplicate sends across worker restarts.
  *  - Credentials are optional: if not present the worker logs and skips.
+ *
+ * Email delivery priority: Google Gmail → Microsoft Outlook → SMTP fallback.
+ * Supports .ics calendar attachments for booking confirmations/reschedules.
+ * Uses DB-driven templates when available, falling back to built-in defaults.
  */
 
 import nodemailer from 'nodemailer';
 import type { Transporter } from 'nodemailer';
 import { notificationRepository } from '../repositories/NotificationRepository.js';
 import { appointmentRepository } from '../repositories/AppointmentRepository.js';
+import { emailTemplateRepository } from '../repositories/EmailTemplateRepository.js';
 import { sendViaGoogleUserMailbox } from '../services/GoogleMailboxService.js';
+import { sendViaMicrosoftUserMailbox } from '../services/MicrosoftMailboxService.js';
 import { env } from '../config/env.js';
 import { NotificationChannel, NotificationType } from '../types/index.js';
 import type { Notification, Appointment, UUID } from '../types/index.js';
+import { generateIcsAttachment } from '../utils/icsGenerator.js';
+import type { IcsAttachment } from '../utils/icsGenerator.js';
+import { renderTemplate, getDefaultTemplate } from '../utils/templateRenderer.js';
+import type { TemplateVariables } from '../utils/templateRenderer.js';
 
 // ---------------------------------------------------------------------------
 // Mail transport (SendGrid SMTP relay — optional)
@@ -60,49 +70,59 @@ async function sendSMS(to: string, body: string): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Email template builder
+// Email template builder (DB-first with built-in fallback)
 // ---------------------------------------------------------------------------
 
-function buildEmailContent(
-  appointment: Appointment,
-  type: NotificationType,
-): { subject: string; html: string } {
-  const { clientName, confirmationRef, startTime, timezone } = appointment;
-
-  const displayTime = new Date(startTime).toLocaleString('en-US', {
-    timeZone: timezone,
+function buildTemplateVariables(appointment: Appointment, orgName?: string, userName?: string): TemplateVariables {
+  const displayDate = new Date(appointment.startTime).toLocaleDateString('en-US', {
+    timeZone: appointment.timezone,
     dateStyle: 'full',
+  });
+  const displayTime = new Date(appointment.startTime).toLocaleTimeString('en-US', {
+    timeZone: appointment.timezone,
     timeStyle: 'short',
   });
+  const durationMs = new Date(appointment.endTime).getTime() - new Date(appointment.startTime).getTime();
+  const durationMinutes = String(Math.round(durationMs / 60_000));
 
-  const templates: Record<NotificationType, { subject: string; heading: string; body: string }> = {
-    [NotificationType.BOOKING_CONFIRMATION]: {
-      subject: `Booking confirmed — ${confirmationRef}`,
-      heading: 'Your booking is confirmed ✓',
-      body: `Hi ${clientName},<br><br>Your appointment has been confirmed for <strong>${displayTime}</strong>.<br>Confirmation reference: <strong>${confirmationRef}</strong>`,
-    },
-    [NotificationType.BOOKING_CANCELLATION]: {
-      subject: `Booking cancelled — ${confirmationRef}`,
-      heading: 'Your booking has been cancelled',
-      body: `Hi ${clientName},<br><br>Your appointment scheduled for <strong>${displayTime}</strong> has been cancelled.<br>Reference: <strong>${confirmationRef}</strong>`,
-    },
-    [NotificationType.BOOKING_REMINDER]: {
-      subject: `Reminder: upcoming appointment — ${confirmationRef}`,
-      heading: 'Reminder: your appointment is coming up',
-      body: `Hi ${clientName},<br><br>This is a reminder for your appointment on <strong>${displayTime}</strong>.<br>Reference: <strong>${confirmationRef}</strong>`,
-    },
+  return {
+    clientName: appointment.clientName,
+    clientEmail: appointment.clientEmail,
+    appointmentDate: displayDate,
+    appointmentTime: displayTime,
+    appointmentTimezone: appointment.timezone,
+    appointmentDuration: durationMinutes,
+    confirmationRef: appointment.confirmationRef,
+    organizationName: orgName ?? 'TimePilot',
+    userName: userName ?? '',
   };
+}
 
-  const t = templates[type];
-  const html = `
-    <!DOCTYPE html><html lang="en"><body style="font-family:sans-serif;max-width:600px;margin:0 auto;padding:24px">
-      <h2 style="color:#0f766e">${t.heading}</h2>
-      <p>${t.body}</p>
-      <hr style="margin:24px 0;border:none;border-top:1px solid #e5e7eb">
-      <p style="color:#6b7280;font-size:0.85rem">TimePilot — calendar booking platform</p>
-    </body></html>`;
+async function buildEmailContent(
+  appointment: Appointment,
+  type: NotificationType,
+): Promise<{ subject: string; html: string }> {
+  const variables = buildTemplateVariables(appointment);
 
-  return { subject: t.subject, html };
+  // Try org-specific DB template first
+  try {
+    const dbTemplate = await emailTemplateRepository.findByOrgAndType(appointment.organizationId, type);
+    if (dbTemplate && dbTemplate.isActive) {
+      return {
+        subject: renderTemplate(dbTemplate.subject, variables),
+        html: renderTemplate(dbTemplate.htmlBody, variables),
+      };
+    }
+  } catch {
+    // Fall through to defaults on any DB error
+  }
+
+  // Fall back to built-in defaults
+  const defaults = getDefaultTemplate(type);
+  return {
+    subject: renderTemplate(defaults.subject, variables),
+    html: renderTemplate(defaults.htmlBody, variables),
+  };
 }
 
 function buildSMSBody(appointment: Appointment, type: NotificationType): string {
@@ -112,12 +132,13 @@ function buildSMSBody(appointment: Appointment, type: NotificationType): string 
     timeStyle: 'short',
   });
   const ref = appointment.confirmationRef;
-  const messages: Record<NotificationType, string> = {
+  const messages: Record<string, string> = {
     [NotificationType.BOOKING_CONFIRMATION]: `TimePilot: Booking confirmed for ${displayTime}. Ref: ${ref}`,
     [NotificationType.BOOKING_CANCELLATION]: `TimePilot: Your booking on ${displayTime} has been cancelled. Ref: ${ref}`,
     [NotificationType.BOOKING_REMINDER]:     `TimePilot: Reminder — appointment on ${displayTime}. Ref: ${ref}`,
+    [NotificationType.BOOKING_RESCHEDULED]:  `TimePilot: Your booking has been moved to ${displayTime}. Ref: ${ref}`,
   };
-  return messages[type];
+  return messages[type] ?? `TimePilot: Notification for ${displayTime}. Ref: ${ref}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -127,6 +148,29 @@ function buildSMSBody(appointment: Appointment, type: NotificationType): string 
 function nextRetryAt(attempts: number): string {
   const delayMs = Math.min(Math.pow(2, attempts) * 60_000, 16 * 60_000);
   return new Date(Date.now() + delayMs).toISOString();
+}
+
+// ---------------------------------------------------------------------------
+// .ics attachment helper
+// ---------------------------------------------------------------------------
+
+const ICS_ELIGIBLE_TYPES = new Set<string>([
+  NotificationType.BOOKING_CONFIRMATION,
+  NotificationType.BOOKING_RESCHEDULED,
+]);
+
+function buildIcsForAppointment(appointment: Appointment, type: NotificationType): IcsAttachment | null {
+  if (!ICS_ELIGIBLE_TYPES.has(type)) return null;
+  return generateIcsAttachment({
+    uid: appointment.id,
+    summary: `Appointment — ${appointment.confirmationRef}`,
+    description: `Booking with ${appointment.clientName} (${appointment.confirmationRef})`,
+    startTime: appointment.startTime,
+    endTime: appointment.endTime,
+    attendeeName: appointment.clientName,
+    attendeeEmail: appointment.clientEmail,
+    status: type === NotificationType.BOOKING_CONFIRMATION ? 'CONFIRMED' : 'CONFIRMED',
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -170,24 +214,44 @@ async function processOne(notification: Notification): Promise<void> {
 
   try {
     if (notification.channel === NotificationChannel.EMAIL) {
-      const { subject, html } = buildEmailContent(appt, notification.type);
+      const { subject, html } = await buildEmailContent(appt, notification.type);
+      const icsAttachment = buildIcsForAppointment(appt, notification.type);
+
+      // Try Google Gmail first
       const sentViaGoogle = await sendViaGoogleUserMailbox({
         userId: appt.userId,
         recipient: notification.recipient,
         subject,
         html,
+        attachments: icsAttachment ? [icsAttachment] : undefined,
       });
 
       if (!sentViaGoogle) {
-        if (!transporter) {
-          throw new Error('Email notifications disabled: Gmail scope not granted and SMTP not configured');
-        }
-        await transporter.sendMail({
-          from: env.SMTP_FROM ?? 'noreply@timepilot.app',
-          to:   notification.recipient,
+        // Try Microsoft Outlook
+        const sentViaMicrosoft = await sendViaMicrosoftUserMailbox({
+          userId: appt.userId,
+          recipient: notification.recipient,
           subject,
           html,
+          attachments: icsAttachment ? [icsAttachment] : undefined,
         });
+
+        if (!sentViaMicrosoft) {
+          // Fall back to SMTP
+          if (!transporter) {
+            throw new Error('Email notifications disabled: Gmail/Outlook scope not granted and SMTP not configured');
+          }
+          const smtpAttachments = icsAttachment
+            ? [{ filename: icsAttachment.filename, content: Buffer.from(icsAttachment.content, 'base64'), contentType: icsAttachment.contentType }]
+            : undefined;
+          await transporter.sendMail({
+            from: env.SMTP_FROM ?? 'noreply@timepilot.app',
+            to:   notification.recipient,
+            subject,
+            html,
+            attachments: smtpAttachments,
+          });
+        }
       }
     } else {
       const body = buildSMSBody(appt, notification.type);

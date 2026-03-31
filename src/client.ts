@@ -492,6 +492,16 @@ export const BOOKING_HTML = `<!DOCTYPE html>
       newTimeBlockEndTime: '13:00',
       newTimeBlockDaysOfWeek: [1, 2, 3, 4, 5],
       newTimeBlockSaving: false,
+      // Email templates & provider
+      emailTemplates: [],
+      emailTemplatesLoading: false,
+      emailTemplateEditing: null,      // type being edited or null
+      emailTemplateSaving: false,
+      emailTemplateError: null,
+      emailTemplateMessage: null,
+      emailTemplatePreview: null,
+      emailProviderStatus: { googleLinked: false, googleEnabled: false, microsoftLinked: false, microsoftEnabled: false },
+      emailProviderLoading: false,
       // Admin appointments page
       appointmentsOrg: null,
       appointments: [],
@@ -1591,6 +1601,116 @@ export const BOOKING_HTML = `<!DOCTYPE html>
             + '</div>'
           )
         )
+        // ── Email Provider ─────────────────────────────────────────
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Email provider</h3>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Connect your Gmail or Outlook account to send booking notifications from your own email address.</p>'
+        + (S.emailProviderLoading
+          ? '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading provider status…</p>'
+          : '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:8px">'
+          + '<div style="border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--panel)">'
+          + '<p style="margin:0 0 8px;font-weight:600;font-size:0.9rem">Gmail</p>'
+          + (S.emailProviderStatus.googleLinked && S.emailProviderStatus.googleEnabled
+            ? '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--accent)">&#10003; Connected &amp; enabled</p>'
+            : S.emailProviderStatus.googleLinked
+              ? '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--muted)">Linked but email scope not granted</p>'
+              : '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--muted)">Not connected</p>'
+          )
+          + '<a class="btn btn-ghost" style="font-size:0.85rem" href="' + resolveBrowserApiBase() + '/api/auth/google/enable-email-scope?returnTo=' + encodeURIComponent(location.href) + '">Enable Gmail sending</a>'
+          + '</div>'
+          + '<div style="border:1px solid var(--border);border-radius:10px;padding:16px;background:var(--panel)">'
+          + '<p style="margin:0 0 8px;font-weight:600;font-size:0.9rem">Outlook</p>'
+          + (S.emailProviderStatus.microsoftLinked && S.emailProviderStatus.microsoftEnabled
+            ? '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--accent)">&#10003; Connected &amp; enabled</p>'
+            : S.emailProviderStatus.microsoftLinked
+              ? '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--muted)">Linked but email scope not granted</p>'
+              : '<p style="margin:0 0 10px;font-size:0.85rem;color:var(--muted)">Not connected</p>'
+          )
+          + '<a class="btn btn-ghost" style="font-size:0.85rem" href="' + resolveBrowserApiBase() + '/api/auth/microsoft/enable-email-scope?returnTo=' + encodeURIComponent(location.href) + '">Enable Outlook sending</a>'
+          + '</div>'
+          + '</div>'
+        )
+        // ── Email Templates ────────────────────────────────────────
+        + '<hr style="border:none;border-top:1px solid var(--border);margin:32px 0" />'
+        + '<h3 style="margin:0 0 16px;font-size:1rem;font-weight:700">Email templates</h3>'
+        + '<p style="margin:0 0 16px;font-size:0.85rem;color:var(--muted)">Customize the email notifications sent for bookings. Use <code>{{variableName}}</code> placeholders. Leave blank to use defaults.</p>'
+        + (S.emailTemplateError ? '<div class="alert-error">' + esc(S.emailTemplateError) + '</div>' : '')
+        + (S.emailTemplateMessage ? '<p style="color:var(--accent);font-weight:600;margin-bottom:12px">' + esc(S.emailTemplateMessage) + '</p>' : '')
+        + (S.emailTemplatesLoading
+          ? '<p style="color:var(--muted);font-size:0.9rem"><span class="spinner spinner-sm"></span> Loading templates…</p>'
+          : (function() {
+            var templateTypes = [
+              { type: 'booking_confirmation', label: 'Booking Confirmed' },
+              { type: 'booking_cancellation', label: 'Booking Cancelled' },
+              { type: 'booking_reminder', label: 'Booking Reminder' },
+              { type: 'booking_rescheduled', label: 'Booking Rescheduled' },
+            ];
+            var customMap = {};
+            (S.emailTemplates || []).forEach(function(t) { customMap[t.type] = t; });
+
+            var listHtml = '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'
+              + templateTypes.map(function(tt) {
+                var custom = customMap[tt.type];
+                var isEditing = S.emailTemplateEditing === tt.type;
+                var statusChip = custom
+                  ? '<span style="background:color-mix(in srgb, var(--accent) 12%, var(--panel));color:var(--accent);padding:3px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">Customized</span>'
+                  : '<span style="background:color-mix(in srgb, var(--muted) 12%, var(--panel));color:var(--muted);padding:3px 8px;border-radius:4px;font-size:0.75rem;font-weight:600">Default</span>';
+
+                var row = '<div style="border:1px solid var(--border);border-radius:10px;overflow:hidden">'
+                  + '<div style="display:flex;align-items:center;justify-content:space-between;padding:14px 16px;cursor:pointer" data-toggle-template="' + esc(tt.type) + '">'
+                  + '<div style="display:flex;align-items:center;gap:10px">'
+                  + '<span style="font-weight:600;font-size:0.9rem">' + esc(tt.label) + '</span>'
+                  + statusChip
+                  + '</div>'
+                  + '<span style="font-size:0.85rem;color:var(--muted)">' + (isEditing ? '&#9650;' : '&#9660;') + '</span>'
+                  + '</div>';
+
+                if (isEditing) {
+                  var subj = custom ? esc(custom.subject || '') : '';
+                  var body = custom ? esc(custom.htmlBody || '') : '';
+                  row += '<div style="border-top:1px solid var(--border);padding:16px;background:var(--panel)">'
+                    + '<form id="email-template-form">'
+                    + '<input type="hidden" name="templateType" value="' + esc(tt.type) + '" />'
+                    + '<div class="form-group">'
+                    + '<label for="tpl-subject">Subject</label>'
+                    + '<input id="tpl-subject" name="subject" type="text" value="' + subj + '" placeholder="e.g. Your booking is confirmed, {{clientName}}" />'
+                    + '</div>'
+                    + '<div class="form-group">'
+                    + '<label for="tpl-htmlBody">HTML body</label>'
+                    + '<textarea id="tpl-htmlBody" name="htmlBody" rows="10" style="width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-family:monospace;font-size:0.85rem;background:var(--panel);resize:vertical">' + body + '</textarea>'
+                    + '</div>'
+                    + '<div style="margin-bottom:16px">'
+                    + '<p style="margin:0 0 6px;font-size:0.8rem;font-weight:600;color:var(--muted)">Available variables (click to copy):</p>'
+                    + '<div style="display:flex;gap:6px;flex-wrap:wrap">'
+                    + ['clientName','clientEmail','appointmentDate','appointmentTime','appointmentTimezone','appointmentDuration','confirmationRef','organizationName','userName'].map(function(v) {
+                      return '<button type="button" class="btn btn-ghost" style="padding:4px 8px;font-size:0.75rem;font-family:monospace" data-copy-var="{{' + v + '}}">{{' + v + '}}</button>';
+                    }).join('')
+                    + '</div>'
+                    + '</div>'
+                    + (S.emailTemplatePreview
+                      ? '<div style="border:1px solid var(--border);border-radius:8px;padding:16px;margin-bottom:16px;background:#fff;color:#000;font-size:0.9rem;max-height:300px;overflow:auto">'
+                      + S.emailTemplatePreview
+                      + '</div>'
+                      : '')
+                    + '<div style="display:flex;gap:10px;flex-wrap:wrap">'
+                    + '<button class="btn" type="submit"' + (S.emailTemplateSaving ? ' disabled' : '') + '>'
+                    + (S.emailTemplateSaving ? '<span class="spinner spinner-sm"></span> Saving…' : 'Save template')
+                    + '</button>'
+                    + '<button type="button" class="btn btn-ghost" id="tpl-preview">Preview</button>'
+                    + (custom ? '<button type="button" class="btn btn-ghost" style="color:var(--error)" data-reset-template="' + esc(tt.type) + '">Reset to default</button>' : '')
+                    + '</div>'
+                    + '</form>'
+                    + '</div>';
+                }
+
+                row += '</div>';
+                return row;
+              }).join('')
+              + '</div>';
+
+            return listHtml;
+          })()
+        )
         + '</div>';
     }
 
@@ -2201,6 +2321,70 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         return;
       }
 
+      // Email template — toggle editor
+      var toggleTplBtn = e.target && e.target.closest('[data-toggle-template]');
+      if (toggleTplBtn) {
+        var tplType = toggleTplBtn.getAttribute('data-toggle-template');
+        S.emailTemplateEditing = (S.emailTemplateEditing === tplType) ? null : tplType;
+        S.emailTemplatePreview = null;
+        S.emailTemplateError = null;
+        render();
+        return;
+      }
+
+      // Email template — copy variable to clipboard
+      var copyVarBtn = e.target && e.target.closest('[data-copy-var]');
+      if (copyVarBtn) {
+        var varText = copyVarBtn.getAttribute('data-copy-var');
+        if (varText && navigator.clipboard) {
+          navigator.clipboard.writeText(varText).then(function() {
+            copyVarBtn.textContent = 'Copied!';
+            setTimeout(function() { copyVarBtn.textContent = varText; }, 1500);
+          });
+        }
+        return;
+      }
+
+      // Email template — preview
+      if (e.target && e.target.id === 'tpl-preview') {
+        if (!S.settingsOrg || !S.emailTemplateEditing) return;
+        var previewForm = document.getElementById('email-template-form');
+        if (!previewForm) return;
+        var previewSubject = previewForm.querySelector('[name="subject"]').value;
+        var previewBody = previewForm.querySelector('[name="htmlBody"]').value;
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/email-templates/' + S.emailTemplateEditing + '/preview', {
+          method: 'POST',
+          body: { subject: previewSubject, htmlBody: previewBody },
+        }).then(function(result) {
+          S.emailTemplatePreview = (result && result.html) || '<p>No preview available</p>';
+          render();
+        }).catch(function(err) {
+          S.emailTemplateError = (err && err.message) || 'Preview failed';
+          render();
+        });
+        return;
+      }
+
+      // Email template — reset to default
+      var resetTplBtn = e.target && e.target.closest('[data-reset-template]');
+      if (resetTplBtn) {
+        var resetType = resetTplBtn.getAttribute('data-reset-template');
+        if (!S.settingsOrg || !resetType) return;
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/email-templates/' + resetType, {
+          method: 'DELETE',
+        }).then(function() {
+          S.emailTemplates = (S.emailTemplates || []).filter(function(t) { return t.type !== resetType; });
+          S.emailTemplateMessage = 'Template reset to default';
+          S.emailTemplatePreview = null;
+          render();
+          setTimeout(function() { S.emailTemplateMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.emailTemplateError = (err && err.message) || 'Failed to reset template';
+          render();
+        });
+        return;
+      }
+
       // Settings panel — back button
       if (e.target && e.target.id === 'settings-back') {
         S.step = 'admin';
@@ -2245,6 +2429,12 @@ export const BOOKING_HTML = `<!DOCTYPE html>
         S.bookingLinksLoading = true;
         S.availabilitiesLoading = true;
         S.timeBlocksLoading = true;
+        S.emailTemplatesLoading = true;
+        S.emailProviderLoading = true;
+        S.emailTemplateEditing = null;
+        S.emailTemplateError = null;
+        S.emailTemplateMessage = null;
+        S.emailTemplatePreview = null;
         S.availabilityError = null;
         S.availabilityMessage = null;
         S.timeBlockError = null;
@@ -2256,18 +2446,32 @@ export const BOOKING_HTML = `<!DOCTYPE html>
           apiFetch('/api/organizations/' + settingsOrgId + '/booking-links'),
           apiFetch('/api/organizations/' + settingsOrgId + '/availability'),
           apiFetch('/api/organizations/' + settingsOrgId + '/time-blocks'),
+          apiFetch('/api/organizations/' + settingsOrgId + '/email-templates'),
+          apiFetch('/api/auth/providers/google/status'),
+          apiFetch('/api/auth/microsoft/email-scope-status'),
         ]).then(function(results) {
           S.settingsOrg = results[0].organization || S.settingsOrg;
           S.userProfile = results[1];
           S.bookingLinks = results[2] || [];
           S.availabilities = results[3] || [];
           S.timeBlocks = results[4] || [];
+          S.emailTemplates = (results[5] && results[5].templates) || [];
+          var gStatus = results[6] || {};
+          var mStatus = results[7] || {};
+          S.emailProviderStatus = {
+            googleLinked: Boolean(gStatus.googleLinked),
+            googleEnabled: Boolean(gStatus.enabled),
+            microsoftLinked: Boolean(mStatus.microsoftLinked),
+            microsoftEnabled: Boolean(mStatus.enabled),
+          };
           S.bookingLinksLoading = false;
           S.availabilitiesLoading = false;
           S.timeBlocksLoading = false;
+          S.emailTemplatesLoading = false;
+          S.emailProviderLoading = false;
           applyTheme(S.settingsOrg);
           render();
-        }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; S.timeBlocksLoading = false; render(); });
+        }).catch(function() { S.bookingLinksLoading = false; S.availabilitiesLoading = false; S.timeBlocksLoading = false; S.emailTemplatesLoading = false; S.emailProviderLoading = false; render(); });
         return;
       }
 
@@ -2424,6 +2628,41 @@ export const BOOKING_HTML = `<!DOCTYPE html>
     });
 
     document.addEventListener('submit', function(e) {
+      // Email template form
+      if (e.target && e.target.id === 'email-template-form') {
+        e.preventDefault();
+        if (S.emailTemplateSaving || !S.settingsOrg) return;
+        var tf = e.target;
+        var tplType = tf.querySelector('[name="templateType"]').value;
+        var tplSubject = tf.querySelector('[name="subject"]').value.trim();
+        var tplHtmlBody = tf.querySelector('[name="htmlBody"]').value;
+        if (!tplSubject && !tplHtmlBody) {
+          S.emailTemplateError = 'Please provide a subject or body';
+          render();
+          return;
+        }
+        S.emailTemplateSaving = true;
+        S.emailTemplateError = null;
+        S.emailTemplateMessage = null;
+        render();
+        apiFetch('/api/organizations/' + S.settingsOrg.id + '/email-templates/' + tplType, {
+          method: 'PUT',
+          body: { subject: tplSubject, htmlBody: tplHtmlBody, textBody: '' },
+        }).then(function(saved) {
+          S.emailTemplates = (S.emailTemplates || []).filter(function(t) { return t.type !== tplType; }).concat([saved]);
+          S.emailTemplateSaving = false;
+          S.emailTemplateMessage = 'Template saved!';
+          S.emailTemplatePreview = null;
+          render();
+          setTimeout(function() { S.emailTemplateMessage = null; render(); }, 3000);
+        }).catch(function(err) {
+          S.emailTemplateSaving = false;
+          S.emailTemplateError = (err && err.message) || 'Failed to save template';
+          render();
+        });
+        return;
+      }
+
       // Org branding / settings form
       if (e.target && e.target.id === 'settings-org-form') {
         e.preventDefault();

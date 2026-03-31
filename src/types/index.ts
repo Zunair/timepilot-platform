@@ -168,6 +168,7 @@ export enum NotificationType {
   BOOKING_CONFIRMATION = 'booking_confirmation',
   BOOKING_REMINDER = 'booking_reminder',
   BOOKING_CANCELLATION = 'booking_cancellation',
+  BOOKING_RESCHEDULED = 'booking_rescheduled',
 }
 
 export enum NotificationChannel {
