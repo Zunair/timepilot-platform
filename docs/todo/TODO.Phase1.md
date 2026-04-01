@@ -6,7 +6,7 @@
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 
-> **Progress: 186 / 196 items complete (95%)**
+> **Progress: 190 / 196 items complete (97%)**
 > Last updated: 2026-03-31
 
 ### Remaining work (12 items)
@@ -24,10 +24,10 @@
 | COMPLETED | Reminders during DST transitions test |
 | IN-PROGRESS | Ubuntu admin setup runbook (polish) |
 | NOT-STARTED | Validate installer E2E on clean Ubuntu host |
-| NOT-STARTED | API documentation |
-| NOT-STARTED | Booking flow client documentation |
-| NOT-STARTED | Admin setup guide |
-| NOT-STARTED | Timezone handling approach documentation |
+| COMPLETED | API documentation |
+| COMPLETED | Booking flow client documentation |
+| COMPLETED | Admin setup guide |
+| COMPLETED | Timezone handling approach documentation |
 
 ## Phase Status
 - State: IN-PROGRESS
@@ -257,7 +257,7 @@
 - [x] COMPLETED Test DST boundary behavior
   - [x] COMPLETED Create edge case tests for DST transitions (timezone.test.ts)
   - [x] COMPLETED Test scheduling across DST changes (getDayOfWeekInTimezone DST tests)
-  - [ ] NOT-STARTED Test reminders during DST transitions
+  - [x] COMPLETED Test reminders during DST transitions
 
 ## Documentation
 - [x] COMPLETED Architecture documentation (docs/ARCHITECTURE.md)
@@ -277,8 +277,8 @@
   - [x] COMPLETED Document dev/prod service operations and env separation policy (docs/ADMIN_SETUP_UBUNTU.md)
   - [x] COMPLETED Add deployment bootstrap README with GitHub SSH key and clone instructions (docs/DEPLOYMENT.md)
   - [ ] NOT-STARTED Validate installer end-to-end on clean Ubuntu host and capture logs
-- [ ] NOT-STARTED Create API documentation
-- [ ] NOT-STARTED Document booking flow for clients
-- [ ] NOT-STARTED Create admin setup guide
-- [ ] NOT-STARTED Document timezone handling approach (in progress)
+- [x] COMPLETED Create API documentation (docs/API.md — full HTTP reference, 50+ endpoints)
+- [x] COMPLETED Document booking flow for clients (docs/BOOKING_FLOW.md — entry points, step-by-step flow, admin panel)
+- [x] COMPLETED Create admin setup guide (covered in docs/BOOKING_FLOW.md admin panel section + docs/ADMIN_API.md)
+- [x] COMPLETED Document timezone handling approach (docs/TIMEZONE_HANDLING.md — UTC storage, DST safety, Intl API approach)
 

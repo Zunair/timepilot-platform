@@ -16,11 +16,11 @@ Enterprise-grade, multi-tenant scheduling platform for secure, scalable appointm
 
 ## Current Status
 
-**Phase 1 (MVP) — 95% Complete** (186 of 196 items done)
+**Phase 1 (MVP) — 97% Complete** (190 of 196 items done)
 
 Completed: multi-tenant architecture, OAuth SSO (Google/Apple/Microsoft), session management, scheduling engine with timezone-safe slot generation, booking UI with calendar, availability & time-block management, async email/SMS notifications with dead-letter queue, admin dashboard, team management, role-based access control, full booking-flow and notification E2E tests, and timezone system-wide + DST transition coverage.
 
-Remaining: Google mailbox finalization, Ubuntu installer E2E validation, API and client-facing documentation.
+Remaining: Google mailbox finalization, Ubuntu installer E2E validation.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details, and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
 
@@ -128,9 +128,12 @@ src/
 └── tests/             # Vitest test suites
 
 docs/
+├── API.md                    # Full HTTP API reference
 ├── ARCHITECTURE.md           # System design and architecture layers
 ├── ADMIN_API.md              # Admin endpoint reference and RBAC matrix
 ├── AVAILABILITY_SETTINGS.md  # Availability feature docs
+├── BOOKING_FLOW.md           # Client booking flow and admin panel guide
+├── TIMEZONE_HANDLING.md      # Timezone storage, conversion, and DST approach
 ├── Phase.RoadMap.md          # 12-phase delivery roadmap
 ├── DEPLOYMENT.md             # SSH setup and deployment bootstrap
 ├── ADMIN_SETUP_UBUNTU.md     # systemd service installation
