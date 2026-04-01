@@ -12,15 +12,15 @@ Enterprise-grade, multi-tenant scheduling platform for secure, scalable appointm
 | **Frontend** | Vanilla JS SPA (`src/client.ts`) |
 | **Auth** | OAuth 2.0 (Google, Apple, Microsoft) |
 | **Security** | RBAC, tenant isolation, session management |
-| **Testing** | Vitest (159 tests across 13 suites) |
+| **Testing** | Vitest (260 tests across 21 suites) |
 
 ## Current Status
 
-**Phase 1 (MVP) — 91% Complete** (156 of 172 items done)
+**Phase 1 (MVP) — 95% Complete** (186 of 196 items done)
 
-Completed: multi-tenant architecture, OAuth SSO (Google/Apple/Microsoft), session management, scheduling engine with timezone-safe slot generation, booking UI with calendar, availability & time-block management, async email/SMS notifications, admin dashboard, team management, and role-based access control.
+Completed: multi-tenant architecture, OAuth SSO (Google/Apple/Microsoft), session management, scheduling engine with timezone-safe slot generation, booking UI with calendar, availability & time-block management, async email/SMS notifications with dead-letter queue, admin dashboard, team management, role-based access control, full booking-flow and notification E2E tests, and timezone system-wide + DST transition coverage.
 
-Remaining: dead-letter queue, E2E tests, Google mailbox finalization, API docs.
+Remaining: Google mailbox finalization, Ubuntu installer E2E validation, API and client-facing documentation.
 
 See [CHANGELOG.md](CHANGELOG.md) for release history, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for details, and [docs/Phase.RoadMap.md](docs/Phase.RoadMap.md) for the full 12-phase roadmap.
 

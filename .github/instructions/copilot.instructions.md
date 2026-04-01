@@ -13,7 +13,7 @@ Build a beautiful, futuristic, intuitive, enterprise-grade multi-tenant calendar
 - Last review date: 2026-03-30
 - Approved by: Tech Lead
 - Active blockers: None
-- Current milestone: Phase 1 MVP — 91% complete (164/180 items)
+- Current milestone: Phase 1 MVP — 95% complete (186/196 items)
 - Completed milestones:
    - Foundational Architecture ✅
    - OAuth 2.0 integration (Google, Apple, Microsoft) ✅
@@ -21,14 +21,15 @@ Build a beautiful, futuristic, intuitive, enterprise-grade multi-tenant calendar
    - Scheduling engine (availability & appointment logic) ✅
    - Client booking UI (vanilla JS SPA) ✅
    - Async notification system (email/SMS via Bull queue) ✅
+   - Dead-letter queue for exhausted notifications ✅
    - Admin dashboard, team management, RBAC ✅
    - Time-block (unavailability) management ✅
    - Booking links with QR codes ✅
    - Ubuntu deployment automation ✅
+   - E2E tests: booking flow, notification worker, timezone + DST ✅
 - Remaining priority items:
-   - Dead-letter queue for failed notifications
-   - End-to-end worker and booking flow tests
    - Google mailbox sending finalization
+   - Ubuntu installer E2E validation
    - API and client-facing documentation
 
 ## TODO Management & Phase Tracking

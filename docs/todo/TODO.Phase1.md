@@ -6,22 +6,22 @@
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 
-> **Progress: 180 / 196 items complete (92%)**
-> Last updated: 2026-03-30
+> **Progress: 186 / 196 items complete (95%)**
+> Last updated: 2026-03-31
 
-### Remaining work (16 items)
+### Remaining work (12 items)
 | Status | Item |
 |--------|------|
 | IN-PROGRESS | OAuth social login (parent — sub-items done, needs final gate) |
-| NOT-STARTED | Dead-letter queue for failed notifications |
+| COMPLETED | Dead-letter queue for failed notifications |
 | IN-PROGRESS | Google mailbox sending (provider integration) |
-| NOT-STARTED | End-to-end worker tests for Google mailbox delivery |
+| COMPLETED | End-to-end worker tests for Google mailbox delivery |
 | IN-PROGRESS | Admin landing and zero-org onboarding flow (polish) |
-| NOT-STARTED | Notification queue worker integration test |
+| COMPLETED | Notification queue worker integration test |
 | IN-PROGRESS | Integration tests (additional coverage) |
-| NOT-STARTED | Full booking flow E2E test |
-| NOT-STARTED | Timezone handling system-wide test |
-| NOT-STARTED | Reminders during DST transitions test |
+| COMPLETED | Full booking flow E2E test |
+| COMPLETED | Timezone handling system-wide test |
+| COMPLETED | Reminders during DST transitions test |
 | IN-PROGRESS | Ubuntu admin setup runbook (polish) |
 | NOT-STARTED | Validate installer E2E on clean Ubuntu host |
 | NOT-STARTED | API documentation |
@@ -170,13 +170,13 @@
   - [x] COMPLETED Set up DB-polling worker (30s interval, production-ready without Redis dependency)
   - [x] COMPLETED Create notification worker processes (src/workers/NotificationWorker.ts)
   - [x] COMPLETED Implement retry logic with exponential backoff (nextRetryAt = min(2^n × 60s, 16min))
-  - [ ] NOT-STARTED Add dead-letter queue for failed notifications (max 5 attempts, then abandoned)
+  - [x] COMPLETED Add dead-letter queue for failed notifications (max 5 attempts → dead_letter status; migration 010, markDeadLetter repo method, worker auto-transition, 6 unit tests)
 
 - [ ] IN-PROGRESS Add provider mailbox sending (Google first)
   - [x] COMPLETED Defer Gmail send scope until post-login banner opt-in flow
   - [x] COMPLETED Add Google mailbox send path in notification worker with SMTP fallback
   - [x] COMPLETED Harden malformed OAuth mailbox data handling and Twilio startup validation
-  - [ ] NOT-STARTED Add end-to-end worker tests for Google mailbox delivery and fallback behavior
+  - [x] COMPLETED Add end-to-end worker tests for Google mailbox delivery and fallback behavior (10 tests covering Google→Microsoft→SMTP chain, .ics attachments, SMS path, dead-letter on exhaustion)
 
 - [x] COMPLETED Add Microsoft Outlook sending via Graph API
   - [x] COMPLETED Create MicrosoftMailboxService with token refresh and Mail.Send scope (src/services/MicrosoftMailboxService.ts)
@@ -242,13 +242,14 @@
 ## Testing & Quality
 - [x] COMPLETED Write comprehensive unit tests
   - [x] COMPLETED Test scheduling engine logic (src/tests/scheduling.test.ts, 12 tests)
-  - [x] COMPLETED Test timezone conversion edge cases (src/tests/timezone.test.ts, 21 tests)
+  - [x] COMPLETED Test timezone conversion edge cases (src/tests/timezone.test.ts, 23 tests)
+  - [x] COMPLETED Test timezone system-wide + DST transitions (src/tests/timezone-system-wide.test.ts, 24 tests covering UTC storage invariant, template variable rendering across 7 timezones, scheduling layer correctness, spring-forward/fall-back DST transitions, cross-timezone round-trip consistency)
   - [x] COMPLETED Test RBAC enforcement (src/tests/rbac.test.ts, 10 tests)
   - [x] COMPLETED Test admin and permissions system (src/tests/admin.test.ts, 11 tests)
-  - [ ] NOT-STARTED Test notification queue processing (worker integration test pending)
+  - [x] COMPLETED Test notification queue processing (src/tests/notification-worker-integration.test.ts, 8 tests covering batch processing, sequential execution, empty queue, mid-batch failure recovery, multi-tick polling, stop/start lifecycle, batch limit, retry pickup)
 
 - [ ] IN-PROGRESS Write integration tests
-  - [ ] NOT-STARTED Test full booking flow end-to-end
+  - [x] COMPLETED Test full booking flow end-to-end (src/tests/booking-flow-e2e.test.ts, 13 tests covering slot lookup, appointment creation with slot validation, double-booking rejection, fire-and-forget notification resilience, confirmation ref lookup, cancellation, rescheduling with conflict guard, and user listing)
   - [x] COMPLETED Test multi-tenant isolation (src/tests/tenant-isolation.test.ts, 9 tests)
   - [x] COMPLETED Test OAuth integration (provider helper tests + callback route integration tests in src/tests/auth-providers.test.ts and src/tests/auth-callbacks.integration.test.ts)
   - [ ] NOT-STARTED Test timezone handling across system

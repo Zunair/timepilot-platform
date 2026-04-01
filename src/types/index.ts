@@ -182,6 +182,7 @@ export enum NotificationStatus {
   FAILED = 'failed',
   DELIVERED = 'delivered',
   BOUNCED = 'bounced',
+  DEAD_LETTER = 'dead_letter',
 }
 
 /**

@@ -261,12 +261,17 @@ async function processOne(notification: Notification): Promise<void> {
     await notificationRepository.markSent(notification.id);
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err);
-    await notificationRepository.markFailed(
-      notification.id,
-      reason,
-      nextRetryAt(notification.attempts),
-    );
-    console.error(`[NotificationWorker] Failed notification ${notification.id}:`, reason);
+    if (notification.attempts + 1 >= 5) {
+      await notificationRepository.markDeadLetter(notification.id, reason);
+      console.warn(`[NotificationWorker] Notification ${notification.id} moved to dead-letter after ${notification.attempts + 1} attempts`);
+    } else {
+      await notificationRepository.markFailed(
+        notification.id,
+        reason,
+        nextRetryAt(notification.attempts),
+      );
+      console.error(`[NotificationWorker] Failed notification ${notification.id}:`, reason);
+    }
   }
 }
 

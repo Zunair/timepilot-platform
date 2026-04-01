@@ -44,6 +44,7 @@ export async function runMigrations(): Promise<void> {
     { name: '007_org_bg_fg_colors', sql: migration007 },
     { name: '008_booking_rescheduled_type', sql: migration008 },
     { name: '009_email_templates', sql: migration009 },
+    { name: '010_dead_letter_status', sql: migration010 },
   ];
 
   for (const migration of migrations) {
@@ -365,4 +366,17 @@ const migration009 = `
   );
 
   CREATE INDEX idx_email_templates_org_id ON email_templates (organization_id);
+`;
+
+/**
+ * Migration 010: Dead-letter queue status for failed notifications
+ *
+ * Adds 'dead_letter' to the notifications status CHECK constraint.
+ * Notifications that exhaust all 5 retry attempts are moved to dead_letter
+ * status so they stop being picked up for retry and can be audited separately.
+ */
+const migration010 = `
+  ALTER TABLE notifications DROP CONSTRAINT IF EXISTS notifications_status_check;
+  ALTER TABLE notifications ADD CONSTRAINT notifications_status_check
+    CHECK (status IN ('pending', 'sent', 'failed', 'delivered', 'bounced', 'dead_letter'));
 `;

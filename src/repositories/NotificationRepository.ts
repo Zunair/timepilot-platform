@@ -79,6 +79,31 @@ export class NotificationRepository {
     );
   }
 
+  async markDeadLetter(id: UUID, reason: string): Promise<void> {
+    await db(
+      `UPDATE notifications
+       SET status = 'dead_letter',
+           failure_reason = $2,
+           attempts = attempts + 1,
+           next_retry_at = NULL,
+           updated_at = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [id, reason],
+    );
+  }
+
+  async findDeadLetter(organizationId: UUID, limit = 50): Promise<Notification[]> {
+    const result = await db(
+      `SELECT ${this.columns.join(', ')} FROM notifications
+       WHERE organization_id = $1
+         AND status = 'dead_letter'
+       ORDER BY updated_at DESC
+       LIMIT $2`,
+      [organizationId, limit],
+    );
+    return result.rows.map(row => this.mapRow(row));
+  }
+
   private mapRow(row: Record<string, unknown>): Notification {
     const toIso = (v: unknown) =>
       v instanceof Date ? v.toISOString() : (v as string);
