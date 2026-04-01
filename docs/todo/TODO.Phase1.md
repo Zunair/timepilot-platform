@@ -6,19 +6,19 @@
     - [x] COMPLETED Support ?bk= token in SPA boot() to pre-load org+user context (src/client.ts)
 # Phase 1 (MVP) - TODO
 
-> **Progress: 190 / 196 items complete (97%)**
+> **Progress: 195 / 196 items complete (99%)**
 > Last updated: 2026-03-31
 
-### Remaining work (12 items)
+### Remaining work (1 item)
 | Status | Item |
 |--------|------|
-| IN-PROGRESS | OAuth social login (parent — sub-items done, needs final gate) |
+| COMPLETED | OAuth social login |
 | COMPLETED | Dead-letter queue for failed notifications |
-| IN-PROGRESS | Google mailbox sending (provider integration) |
+| COMPLETED | Google mailbox sending (provider integration) |
 | COMPLETED | End-to-end worker tests for Google mailbox delivery |
-| IN-PROGRESS | Admin landing and zero-org onboarding flow (polish) |
+| COMPLETED | Admin landing and zero-org onboarding flow |
 | COMPLETED | Notification queue worker integration test |
-| IN-PROGRESS | Integration tests (additional coverage) |
+| COMPLETED | Integration tests |
 | COMPLETED | Full booking flow E2E test |
 | COMPLETED | Timezone handling system-wide test |
 | COMPLETED | Reminders during DST transitions test |
@@ -54,7 +54,7 @@
   - [x] COMPLETED Build org member management system (src/repositories/OrganizationMemberRepository.ts)
 
 ## Authentication & Authorization
-- [ ] IN-PROGRESS Implement social login with OAuth/OIDC
+- [x] COMPLETED Implement social login with OAuth/OIDC
   - [x] COMPLETED Google OAuth integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
   - [x] COMPLETED Apple Sign-In integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
   - [x] COMPLETED Microsoft OAuth integration (src/routes/auth.routes.ts, src/tests/auth-providers.test.ts)
@@ -172,7 +172,7 @@
   - [x] COMPLETED Implement retry logic with exponential backoff (nextRetryAt = min(2^n × 60s, 16min))
   - [x] COMPLETED Add dead-letter queue for failed notifications (max 5 attempts → dead_letter status; migration 010, markDeadLetter repo method, worker auto-transition, 6 unit tests)
 
-- [ ] IN-PROGRESS Add provider mailbox sending (Google first)
+- [x] COMPLETED Add provider mailbox sending (Google first)
   - [x] COMPLETED Defer Gmail send scope until post-login banner opt-in flow
   - [x] COMPLETED Add Google mailbox send path in notification worker with SMTP fallback
   - [x] COMPLETED Harden malformed OAuth mailbox data handling and Twilio startup validation
@@ -214,7 +214,7 @@
   - [x] COMPLETED Load email templates and provider status on settings panel open (src/client.ts)
 
 ## Post-Login Onboarding
-- [ ] IN-PROGRESS Add admin landing and zero-org onboarding flow
+- [x] COMPLETED Add admin landing and zero-org onboarding flow
   - [x] COMPLETED Route identity-first logins to admin landing instead of booking page
   - [x] COMPLETED Show org list and user id for logged-in users on /admin
   - [x] COMPLETED Let users without orgs choose create-organization vs appointment intent
@@ -248,11 +248,11 @@
   - [x] COMPLETED Test admin and permissions system (src/tests/admin.test.ts, 11 tests)
   - [x] COMPLETED Test notification queue processing (src/tests/notification-worker-integration.test.ts, 8 tests covering batch processing, sequential execution, empty queue, mid-batch failure recovery, multi-tick polling, stop/start lifecycle, batch limit, retry pickup)
 
-- [ ] IN-PROGRESS Write integration tests
+- [x] COMPLETED Write integration tests
   - [x] COMPLETED Test full booking flow end-to-end (src/tests/booking-flow-e2e.test.ts, 13 tests covering slot lookup, appointment creation with slot validation, double-booking rejection, fire-and-forget notification resilience, confirmation ref lookup, cancellation, rescheduling with conflict guard, and user listing)
   - [x] COMPLETED Test multi-tenant isolation (src/tests/tenant-isolation.test.ts, 9 tests)
   - [x] COMPLETED Test OAuth integration (provider helper tests + callback route integration tests in src/tests/auth-providers.test.ts and src/tests/auth-callbacks.integration.test.ts)
-  - [ ] NOT-STARTED Test timezone handling across system
+  - [x] COMPLETED Test timezone handling across system (src/tests/timezone-system-wide.test.ts, 24 tests covering UTC storage, template rendering across 7 timezones, scheduling correctness, DST transitions, round-trip consistency)
 
 - [x] COMPLETED Test DST boundary behavior
   - [x] COMPLETED Create edge case tests for DST transitions (timezone.test.ts)

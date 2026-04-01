@@ -13,7 +13,7 @@ Build a beautiful, futuristic, intuitive, enterprise-grade multi-tenant calendar
 - Last review date: 2026-03-30
 - Approved by: Tech Lead
 - Active blockers: None
-- Current milestone: Phase 1 MVP — 97% complete (190/196 items)
+- Current milestone: Phase 1 MVP — 99% complete (195/196 items)
 - Completed milestones:
    - Foundational Architecture ✅
    - OAuth 2.0 integration (Google, Apple, Microsoft) ✅
@@ -29,8 +29,7 @@ Build a beautiful, futuristic, intuitive, enterprise-grade multi-tenant calendar
    - E2E tests: booking flow, notification worker, timezone + DST ✅
    - API, booking flow, and timezone documentation ✅
 - Remaining priority items:
-   - Google mailbox sending finalization
-   - Ubuntu installer E2E validation
+   - Validate installer E2E on clean Ubuntu host
 
 ## TODO Management & Phase Tracking
 **All work MUST follow this workflow to prevent drift and ensure accountability:**
